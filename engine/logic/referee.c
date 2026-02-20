@@ -114,18 +114,12 @@ int referee(struct Scene* scene) {
         struct Team* scoring_team = (state == 1) ? scene->first_team : scene->second_team;
         scoring_team->score++;
 
-        scene->state = STATE_GOAL;
-
         return GOAL;
     }
 
     // check if ball is out
     else if(out(ball_x, ball_y))
-    { 
-        scene->state = STATE_OUT;
-        
         return OUT;
-    }
 
     // no event occurred.
     return PLAY_ON;
@@ -238,18 +232,20 @@ void verify_movement(struct Player *player) {
 void verify_shoot(struct Ball *ball, bool kickoff) {
     struct Player* player = ball->possessor;
     float max_speed = MAX_BALL_VELOCITY * player->talents.shooting;
+    float abs_velocity_x = (ball->velocity.x > 0) ? ball->velocity.x : (ball->velocity.x * -1.0f);
+    float abs_velocity_y = (ball->velocity.y > 0) ? ball->velocity.y : (ball->velocity.y * -1.0f);
     
     // checking x velocity
-    if(ball->velocity.x > max_speed)
+    if(abs_velocity_x > max_speed)
     {
-        ball->velocity.x = max_speed;
+        ball->velocity.x = (ball->velocity.x > 0) ? max_speed : (max_speed * -1.0f);
         printf(" ERROR: Demanding to shoot too fast in dimension x! (team %d, player %d)\n", player->team, player->kit);
     }
 
     // checking y velocity
-    if(ball->velocity.y > max_speed)
+    if(abs_velocity_y > max_speed)
     {
-        ball->velocity.y = max_speed;
+        ball->velocity.y = (ball->velocity.y > 0) ? max_speed : (max_speed * -1.0f);
         printf(" ERROR: Demanding to shoot too fast in dimension y! (team %d, player %d)\n", player->team, player->kit);
     }
 
