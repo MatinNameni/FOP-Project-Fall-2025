@@ -24,24 +24,24 @@
  * - 0 if no goal has occurred.
  */
 static int goal(float x, float y) {
-    float top_point = y + BALL_RADIUS;
-    float bottom_point = y - BALL_RADIUS;
+    float top_point = y - BALL_RADIUS;
+    float bottom_point = y + BALL_RADIUS;
     float right_point = x + BALL_RADIUS;
     float left_point = x - BALL_RADIUS;
 
     // check if Team 1 scored
-    if ((left_point > CENTER_X + PITCH_W / 2) &&
-        (top_point < CENTER_Y + GOAL_HEIGHT / 2) && 
-        (bottom_point > CENTER_Y - GOAL_HEIGHT / 2))
+    if ((left_point   > CENTER_X + PITCH_W / 2) &&
+        (top_point    > CENTER_Y - GOAL_HEIGHT / 2) && 
+        (bottom_point < CENTER_Y + GOAL_HEIGHT / 2))
         {
             printf("GOAL! Right net hit at x:%.2f, y=%.2f\n", x, y);
             return 1;
         }
 
     // check if Team 2 scored
-    else if((right_point < CENTER_X - PITCH_W / 2) &&
-            (top_point < CENTER_Y + GOAL_HEIGHT / 2) && 
-            (bottom_point > CENTER_Y - GOAL_HEIGHT / 2))
+    else if((right_point  < CENTER_X - PITCH_W / 2) &&
+            (top_point    > CENTER_Y - GOAL_HEIGHT / 2) && 
+            (bottom_point < CENTER_Y + GOAL_HEIGHT / 2))
         {
             printf("GOAL! Left net hit at x:%.2f, y=%.2f\n", x, y);
             return 2;
@@ -64,15 +64,15 @@ static int goal(float x, float y) {
  * @return true if the ball is fully out of bounds, false otherwise.
  */
 static bool out(float x, float y) {
-    float top_point = y + BALL_RADIUS;
-    float bottom_point = y - BALL_RADIUS;
+    float top_point = y - BALL_RADIUS;
+    float bottom_point = y + BALL_RADIUS;
     float right_point = x + BALL_RADIUS;
     float left_point = x - BALL_RADIUS;
     
-    if ((top_point < CENTER_Y  - PITCH_H / 2) ||
-        (bottom_point > CENTER_Y + PITCH_H / 2) || 
-        (right_point < CENTER_X - PITCH_W / 2) ||
-        (left_point > CENTER_X + PITCH_H / 2))
+    if ((top_point    > CENTER_Y - PITCH_H / 2) ||
+        (bottom_point < CENTER_Y + PITCH_H / 2) ||
+        (right_point  < CENTER_X - PITCH_W / 2) ||
+        (left_point   > CENTER_X + PITCH_H / 2))
         {
             printf("Ball is out: x=%.2f, y=%.2f\n", x, y);
             return true;
