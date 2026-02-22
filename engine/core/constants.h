@@ -21,7 +21,7 @@
 
 #define MAX_TALENT_PER_PLAYER 20
 #define MAX_TALENT_PER_SKILL 10
-#define MAX_PLAYER_VELOCITY 100.0f
+#define MAX_PLAYER_VELOCITY 10.0f
 #define MAX_BALL_VELOCITY 150.0f
 
 /** * @brief Ball friction coefficient. 
