@@ -69,8 +69,8 @@ static bool out(float x, float y) {
     float right_point = x + BALL_RADIUS;
     float left_point = x - BALL_RADIUS;
     
-    if ((top_point    > CENTER_Y - PITCH_H / 2) ||
-        (bottom_point < CENTER_Y + PITCH_H / 2) ||
+    if ((top_point    > CENTER_Y + PITCH_H / 2) ||
+        (bottom_point < CENTER_Y - PITCH_H / 2) ||
         (right_point  < CENTER_X - PITCH_W / 2) ||
         (left_point   > CENTER_X + PITCH_H / 2))
         {

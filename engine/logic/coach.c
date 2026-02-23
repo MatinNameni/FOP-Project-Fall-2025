@@ -44,7 +44,7 @@ bool coach_both_teams = true;
 /* -------------------------------------------------------------------------
  * movement logic helper functions prototype
  * ------------------------------------------------------------------------- */
-static void verify_movement(struct Player *player);
+static void control_movement(struct Player *player);
 static void move_player_back_to_field(struct Player *player);
 static bool verify_position(struct Player *player, const struct Scene *scene);
 static int is_colliding(const struct Player* p1, const struct Player* p2);
@@ -60,7 +60,7 @@ void movement_logic_1_1(struct Player *self, const struct Scene *scene) { (void)
 void movement_logic_1_2(struct Player *self, const struct Scene *scene) { (void)scene; }
 void movement_logic_1_3(struct Player *self, const struct Scene *scene) { (void)scene; }
 void movement_logic_1_4(struct Player *self, const struct Scene *scene) { forward_logic(self, scene); }
-void movement_logic_1_5(struct Player *self, const struct Scene *scene) { (void) scene; }
+void movement_logic_1_5(struct Player *self, const struct Scene *scene) { (void)scene; }
 
 /* Team 2 movement logic */
 void movement_logic_2_0(struct Player *self, const struct Scene *scene) { (void)scene; }
@@ -247,20 +247,19 @@ struct Vec2 get_preferred_positions(int team, int kit) {
  * movement logic helper functions
  * ------------------------------------------------------------------------- */
 
-static Vec2 velocity_vector_towards_position(Vec2 point1, Vec2 point2, float velocity){
-    float x_distance = point2.x - point1.x;
-    float y_distance = point2.y - point1.y;
-    float k = fabs(x_distance / y_distance);
+ /**
+ * @brief Creates a velocity vector towards the position given
+ */
+static Vec2 make_velocity_vector(Vec2 start, Vec2 target, float velocity){
+    float x_distance = target.x - start.x;
+    float y_distance = target.y - start.y;
+    float distance = hypotf(x_distance, y_distance);
 
-    float x_multiplier = (x_distance < 0) ? -1.0f : 1.0f;
-    float y_multiplier = (y_distance < 0) ? -1.0f : 1.0f;
-
-    float x_velocity = velocity * x_multiplier;
-    float y_velocity = velocity * y_multiplier;
+    if (distance < 0.1f) return (Vec2){0, 0};
 
     Vec2 new_vel = {
-        .x =  (k < 1) ? x_velocity * k : x_velocity,
-        .y = (k < 1) ? y_velocity : y_velocity / k
+        .x =  (x_distance / distance) * velocity,
+        .y = (y_distance / distance) * velocity
     };
 
     return new_vel;
@@ -274,7 +273,7 @@ static Vec2 velocity_vector_towards_position(Vec2 point1, Vec2 point2, float vel
  *
  * @param player Pointer to the player whose movement is being verified.
  */
-static void verify_movement(struct Player *player) {
+static void control_movement(struct Player *player) {
     float max_speed = MAX_PLAYER_VELOCITY* player->talents.shooting;
     float abs_velocity_x = (player->velocity.x > 0) ? player->velocity.x : (player->velocity.x * -1.0f);
     float abs_velocity_y = (player->velocity.y > 0) ? player->velocity.y : (player->velocity.y * -1.0f);
@@ -308,8 +307,8 @@ static bool is_player_out(struct Player *player){
     float right_point = player->position.x + player->radius;
     float left_point = player->position.x - player->radius;
 
-    if ((top_point    > PITCH_Y) ||
-        (bottom_point < PITCH_Y + PITCH_H) ||
+    if ((top_point    > PITCH_Y + PITCH_H) ||
+        (bottom_point < PITCH_Y) ||
         (left_point   > PITCH_X + PITCH_W) ||
         (right_point  < PITCH_X))
         {
@@ -458,7 +457,7 @@ static bool verify_collision(struct Player *player, const struct Scene *scene) {
 
         // check if player collides with p1
         if(is_colliding(player, p1) && player != p1){
-            Vec2 new_vel = velocity_vector_towards_position(p1->position, player->position, max_speed);
+            Vec2 new_vel = make_velocity_vector(p1->position, player->position, max_speed);
             
             player->velocity.x += new_vel.x;
             player->velocity.y += new_vel.y;
@@ -468,7 +467,7 @@ static bool verify_collision(struct Player *player, const struct Scene *scene) {
 
         // check if player collides with p2
         if(is_colliding(player, p2) && player != p2){
-            Vec2 new_vel = velocity_vector_towards_position(p2->position, player->position, max_speed);
+            Vec2 new_vel = make_velocity_vector(p2->position, player->position, max_speed);
             
             player->velocity.x += new_vel.x;
             player->velocity.y += new_vel.y;
@@ -481,8 +480,15 @@ static bool verify_collision(struct Player *player, const struct Scene *scene) {
 }
 
 
+/* -------------------------------------------------------------------------
+ * movement logic functions
+ * ------------------------------------------------------------------------- */
+
+/**
+ * @brief movement logic for forwards
+ */
 static void forward_logic(struct Player *self, const struct Scene *scene){
-    verify_movement(self);
+    control_movement(self);
     if(verify_position(self, scene)) return;
     if(verify_collision(self, scene)) return;
 
@@ -505,9 +511,9 @@ static void forward_logic(struct Player *self, const struct Scene *scene){
     // if he has the ball he rans toward the opponent goal
     if(ball->possessor == self)
     {
-        self->velocity = velocity_vector_towards_position(self->position, opponent_goal, max_speed);
+        self->velocity = make_velocity_vector(self->position, opponent_goal, max_speed);
 
-        verify_movement(self);
+        control_movement(self);
     }
 
     else
@@ -515,9 +521,9 @@ static void forward_logic(struct Player *self, const struct Scene *scene){
         // if ball is in his team's control he goes back to the opponent's half
         if(ball->last_team == self->team)
         {
-            self->velocity = velocity_vector_towards_position(self->position, get_preferred_positions(self->team, self->kit), max_speed);
+            self->velocity = make_velocity_vector(self->position, get_preferred_positions(self->team, self->kit), max_speed);
 
-            verify_movement(self);
+            control_movement(self);
         }
 
         // otherwise if the ball be in the opponent's half, he tries to catch the ball
@@ -526,31 +532,37 @@ static void forward_logic(struct Player *self, const struct Scene *scene){
         {
             if (ball->position.x > CENTER_X && ball->position.x < opponent_goal.x)
             {
-                self->velocity = velocity_vector_towards_position(self->position, opponent_goal, max_speed);
+                self->velocity = make_velocity_vector(self->position, opponent_goal, max_speed);
 
-                verify_movement(self);
+                control_movement(self);
             }
 
             else
             {
-                self->velocity = velocity_vector_towards_position(self->position, get_preferred_positions(self->team, self->kit), max_speed);
+                self->velocity = make_velocity_vector(self->position, get_preferred_positions(self->team, self->kit), max_speed);
 
-                verify_movement(self);
+                control_movement(self);
             }
         }
     }
 }
 
 
+/**
+ * @brief movement logic for defences
+ */
 static void defence_logic(struct Player *self, const struct Scene *scene){
-    verify_movement(self);
-    verify_position(self, scene);
-    verify_collision(self, scene);
+    control_movement(self);
+    if(verify_position(self, scene)) return;
+    if(verify_collision(self, scene)) return;
 }
 
 
+/**
+ * @brief movement logic for the goalkeeper
+ */
 static void gk_logic(struct Player *self, const struct Scene *scene){
-    verify_movement(self);
-    verify_position(self, scene);
-    verify_collision(self, scene);
+    control_movement(self);
+    if(verify_position(self, scene)) return;
+    if(verify_collision(self, scene)) return;
 }
