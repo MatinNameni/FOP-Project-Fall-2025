@@ -175,22 +175,22 @@ PlayerLogicFn get_change_state_logic(int team, int kit) {
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Talents team1_talents[6] = {
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
+    {3, 6, 4, 7},   // forward 1   
+    {3, 7, 3, 7},   // forward 2
+    {7, 4, 3, 6},   // defender 1
+    {8, 3, 2, 7},   // gk
+    {8, 4, 3, 5},   // defender 2
+    {4, 5, 4, 7},   // forward 3
 };
 
 /* Team 2 */
 static struct Talents team2_talents[6] = {
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
-    {5, 5, 5, 5},
+    {2, 6, 4, 8},   // forward 1
+    {4, 5, 4, 7},   // forward 2
+    {7, 5, 3, 5},   // defender 1
+    {8, 3, 2, 7},   // gk
+    {8, 4, 2, 6},   // defender 2
+    {3, 7, 3, 7},   // forward 3
 };
 
 struct Talents get_talents(int team, int kit) {
@@ -208,22 +208,22 @@ struct Talents get_talents(int team, int kit) {
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Vec2 team1_positions[6] = { 
-    {300, CENTER_Y},        // forward 1
-    {250, CENTER_Y-150},    // forward 2
+    {400, CENTER_Y},        // forward 1
+    {350, CENTER_Y-150},    // forward 2
     {200, CENTER_Y-75},     // defender 1
-    {150, CENTER_Y},        // gk
+    {50, CENTER_Y},         // gk
     {200, CENTER_Y+75},     // defender 2
-    {250, CENTER_Y+150},    // forward 3
+    {350, CENTER_Y+150},    // forward 3
 };
 
 /* Team 2 */
 static struct Vec2 team2_positions[6] = { 
     {750, CENTER_Y},        // forward 1
-    {800, CENTER_Y-150},    // forward 2
-    {850, CENTER_Y-75},     // defender 1
-    {900, CENTER_Y},        // gk
-    {850, CENTER_Y+75},     // defender 2
-    {800, CENTER_Y+150},    // forward 3
+    {700, CENTER_Y-150},    // forward 2
+    {800, CENTER_Y-75},     // defender 1
+    {950, CENTER_Y},        // gk
+    {800, CENTER_Y+75},     // defender 2
+    {700, CENTER_Y+150},    // forward 3
 };
 
 struct Vec2 get_positions(int team, int kit) {
@@ -236,12 +236,12 @@ struct Vec2 get_positions(int team, int kit) {
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Vec2 team1_preferred_positions[6] = { 
-    {750, CENTER_Y},  // forward 1
-    {850, CENTER_Y-200},  // forward 2
-    {200, CENTER_Y-75},  // defender 1
-    {150, CENTER_Y},  // gk
-    {200, CENTER_Y+75},  // defender 2
-    {850, CENTER_Y+200},  // forward 3
+    {750, CENTER_Y},        // forward 1
+    {850, CENTER_Y-200},    // forward 2
+    {200, CENTER_Y-75},     // defender 1
+    {50, CENTER_Y},         // gk
+    {200, CENTER_Y+75},     // defender 2
+    {850, CENTER_Y+200},    // forward 3
 };
 
 /* Team 2 */
@@ -249,7 +249,7 @@ static struct Vec2 team2_preferred_positions[6] = {
     {250, CENTER_Y},        // forward 1
     {200, CENTER_Y-200},    // forward 2
     {800, CENTER_Y-75},     // defender 1
-    {900, CENTER_Y},        // gk
+    {950, CENTER_Y},        // gk
     {800, CENTER_Y+75},     // defender 2
     {200, CENTER_Y+200},    // forward 3
 };
@@ -427,8 +427,8 @@ static bool verify_position(struct Player *player, const struct Scene *scene) {
             return true;
         }
 
-        if ((scene->state == STATE_OUT && scene->ball->possessor != player) ||
-            scene->state != STATE_OUT)
+        if ((scene->state == STATE_RESTARTING && scene->ball->possessor != player) ||
+            scene->state != STATE_RESTARTING)
         {
             move_player_back_to_field(player);
             return true;
@@ -814,7 +814,7 @@ static void forward_shooting_logic(struct Player *player, const struct Scene *sc
     }
 
 
-    else if(scene->state == STATE_OUT && ball->possessor == player){
+    else if(scene->state == STATE_RESTARTING && ball->possessor == player){
         struct Player* nearest = nearest_teammate(player, scene);
         pass(ball, nearest, max_velocity);
     }    
@@ -959,8 +959,8 @@ static int is_ball_colliding(const struct Player* p, const struct Ball* b) {
 
     }
 
-    else if(scene->state == STATE_OUT){
-        if(ball->possessor && ball->possessor == player) player->state = SHOOTING;
+    else if(scene->state == STATE_RESTARTING){
+        if(ball->possessor == player) player->state = SHOOTING;
     }
 }
 
