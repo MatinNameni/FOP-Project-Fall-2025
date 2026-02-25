@@ -196,19 +196,21 @@ void verify_state(struct Player *player, struct Scene *scene) {
  * @param player Pointer to the player whose movement is being verified.
  */
 void verify_movement(struct Player *player) {
-    float max_speed = MAX_PLAYER_VELOCITY * (float)player->talents.agility;
+    float max_speed = MAX_PLAYER_VELOCITY * player->talents.agility / (float)MAX_TALENT_PER_SKILL;
+    float abs_velocity_x = (player->velocity.x > 0) ? player->velocity.x : (player->velocity.x * -1.0f);
+    float abs_velocity_y = (player->velocity.y > 0) ? player->velocity.y : (player->velocity.y * -1.0f);
 
     // checking x velocity
-    if(player->velocity.x > max_speed)
+    if(abs_velocity_x > max_speed)
     {
-        player->velocity.x = max_speed;
+        player->velocity.x = (player->velocity.x > 0) ? max_speed : (max_speed * -1.0f);
         printf(" ERROR: Demanding to run too fast in dimension x! (team %d, player %d)\n", player->team, player->kit);
     }
 
     // checking y velocity
-    if(player->velocity.y > max_speed)
+    if(abs_velocity_y > max_speed)
     {
-        player->velocity.y = max_speed;
+        player->velocity.y = (player->velocity.y > 0) ? max_speed : (max_speed * -1.0f);
         printf(" ERROR: Demanding to run too fast in dimension y! (team %d, player %d)\n", player->team, player->kit);
     }
 }
@@ -231,7 +233,7 @@ void verify_movement(struct Player *player) {
  */
 void verify_shoot(struct Ball *ball, bool kickoff) {
     struct Player* player = ball->possessor;
-    float max_speed = MAX_BALL_VELOCITY * player->talents.shooting;
+    float max_speed = MAX_BALL_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
     float abs_velocity_x = (ball->velocity.x > 0) ? ball->velocity.x : (ball->velocity.x * -1.0f);
     float abs_velocity_y = (ball->velocity.y > 0) ? ball->velocity.y : (ball->velocity.y * -1.0f);
     

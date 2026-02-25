@@ -14,6 +14,16 @@
 // Set to true to test your logic on both teams
 bool coach_both_teams = true;
 
+
+// Used for handling the "freeze" problem players having for tackle
+// if the player's tackle counter reaches over a certain number,
+// his state will become IDLE
+int tacke_counters[2][PLAYER_COUNT] = {0};
+
+
+// 1 if player just shot.
+int player_shot[2][PLAYER_COUNT] = {0};
+
 /* -------------------------------------------------------------------------
  * Logic Functions
  *  TODO 1: You must implement the following functions in Phase 2.
@@ -280,7 +290,7 @@ static Vec2 make_velocity_vector(Vec2 start, Vec2 target, float velocity){
  * @param player Pointer to the player whose movement is being verified.
  */
 static void verify_movement(struct Player *player) {
-    float max_speed = MAX_PLAYER_VELOCITY * player->talents.shooting;
+    float max_speed = MAX_PLAYER_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
     float abs_velocity_x = (player->velocity.x > 0) ? player->velocity.x : (player->velocity.x * -1.0f);
     float abs_velocity_y = (player->velocity.y > 0) ? player->velocity.y : (player->velocity.y * -1.0f);
     
@@ -344,7 +354,7 @@ static void move_player_back_to_field(struct Player *player){
     bool past_left = (right_point < left_line);
     bool past_right = (left_point > right_line);
 
-    float max_speed = MAX_PLAYER_VELOCITY * (float)player->talents.agility;
+    float max_speed = MAX_PLAYER_VELOCITY * (float)player->talents.agility / (float)MAX_TALENT_PER_SKILL;
 
     if(past_top)
     {
@@ -453,7 +463,7 @@ static int is_colliding(const struct Player* p1, const struct Player* p2) {
  * @param scene Pointer to the current game scene.
  */
 static bool verify_collision(struct Player *player, const struct Scene *scene) {
-    float max_speed = MAX_PLAYER_VELOCITY * player->talents.shooting;
+    float max_speed = MAX_PLAYER_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
     bool collision = false;
 
     for (int i = 0; i < PLAYER_COUNT; i++)
@@ -499,7 +509,11 @@ static void forward_movement_logic(struct Player *self, const struct Scene *scen
     if(verify_collision(self, scene)) return;
 
     struct Ball* ball = scene->ball;
-    float max_speed = MAX_PLAYER_VELOCITY * self->talents.shooting;
+    float max_speed = MAX_PLAYER_VELOCITY * self->talents.shooting / (float)MAX_TALENT_PER_SKILL;
+
+    float x_distance = ball->position.x - self->position.x;
+    float y_distance = ball->position.y - self->position.y;
+    float distance = hypotf(x_distance, y_distance);
 
     Vec2 team1_goal = {
         .x = CENTER_X - PITCH_W / 2,
@@ -517,30 +531,30 @@ static void forward_movement_logic(struct Player *self, const struct Scene *scen
     if(ball->possessor == self)
     {
         self->velocity = make_velocity_vector(self->position, opponent_goal, max_speed);
-
-        verify_movement(self);
     }
 
     else
     {
+        // if no one has the ball and it's in a defined range he tries to catch it
+        if(!ball->possessor){
+            if(distance <= 200.0f && !player_shot[(self->team) - 1][self->kit]){
+                self->velocity = make_velocity_vector(self->position, ball->position, max_speed);
+
+                return;
+            }
+        }
+
         // if ball is in his team's control he goes back to the opponent's half
         if(ball->last_team == self->team)
         {
             self->velocity = make_velocity_vector(self->position, get_preferred_positions(self->team, self->kit), max_speed);
-
-            verify_movement(self);
         }
 
         else
         {
             // get the ball if opponent is in a defined range
-            float x_distance = ball->position.x - self->position.x;
-            float y_distance = ball->position.y - self->position.y;
-            float distance = hypotf(x_distance, y_distance);
             if (distance <= 100.0f){
                 self->velocity = make_velocity_vector(self->position, ball->position, max_speed);
-
-                verify_movement(self);
 
                 return;
             }
@@ -551,15 +565,11 @@ static void forward_movement_logic(struct Player *self, const struct Scene *scen
                 (self->team == 2 && ball->position.x < CENTER_X))
             {
                 self->velocity = make_velocity_vector(self->position, ball->position, max_speed);
-
-                verify_movement(self);
             }
 
             else
             {
                 self->velocity = make_velocity_vector(self->position, get_preferred_positions(self->team, self->kit), max_speed);
-
-                verify_movement(self);
             }
         }
     }
@@ -625,7 +635,7 @@ static struct Player* nearest_teammate(const struct Player* origin, const struct
  */
 static void verify_shoot(struct Ball *ball) {
     struct Player* player = ball->possessor;
-    float max_speed = MAX_BALL_VELOCITY * player->talents.shooting;
+    float max_speed = MAX_BALL_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
     float abs_velocity_x = (ball->velocity.x > 0) ? ball->velocity.x : (ball->velocity.x * -1.0f);
     float abs_velocity_y = (ball->velocity.y > 0) ? ball->velocity.y : (ball->velocity.y * -1.0f);
     
@@ -636,6 +646,19 @@ static void verify_shoot(struct Ball *ball) {
     // checking y velocity
     if(abs_velocity_y > max_speed)
         ball->velocity.y = (ball->velocity.y > 0) ? max_speed : (max_speed * -1.0f);
+}
+
+
+static void player_shot_fill_zero(){
+    for (int i = 0; i < 2; i++)
+    {
+        for (int j = 0; j < PLAYER_COUNT; j++)
+        {
+            player_shot[i][j] = 0;
+        }
+        
+    }
+    
 }
 
 
@@ -651,6 +674,12 @@ static void pass(struct Ball* ball, struct Player *target, float velocity){
 
     ball->velocity.x = new_vel.x;
     ball->velocity.y = new_vel.y;
+
+    // setting player player_shot to 1
+    player_shot_fill_zero();
+    int t_idx = ball->possessor->team - 1;
+    int p_idx = ball->possessor->kit;
+    player_shot[t_idx][p_idx] = 1;
 }
 
 
@@ -666,6 +695,12 @@ static void shoot(struct Ball* ball, struct Vec2 target, float velocity){
 
     ball->velocity.x = new_vel.x;
     ball->velocity.y = new_vel.y;
+
+    // setting player player_shot to 1
+    player_shot_fill_zero();
+    int t_idx = ball->possessor->team - 1;
+    int p_idx = ball->possessor->kit;
+    player_shot[t_idx][p_idx] = 1;
 }
 
 
@@ -697,7 +732,7 @@ static bool is_kickoff(const struct Scene *scene){
  * ------------------------------------------------------------------------- */
 static void forward_shooting_logic(struct Player *player, const struct Scene *scene){
     struct Ball* ball = scene->ball;
-    float max_velocity = MAX_BALL_VELOCITY * player->talents.shooting;
+    float max_velocity = MAX_BALL_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
 
     verify_shoot(ball);
 
@@ -716,6 +751,7 @@ static void forward_shooting_logic(struct Player *player, const struct Scene *sc
         return;
     }
 
+
     else if(scene->state == STATE_RUNNING){
         // if he is near the opponent's goal the shoots
         // the ball towards the goal
@@ -731,7 +767,7 @@ static void forward_shooting_logic(struct Player *player, const struct Scene *sc
 
         Vec2 opponent_goal = (player->team == 1) ? team2_goal : team1_goal;
         
-        float max_velocity = MAX_BALL_VELOCITY * player->talents.shooting;
+        float max_velocity = MAX_BALL_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
 
         float top_line    = opponent_goal.y - GOAL_HEIGHT / 2;
         float bottom_line = opponent_goal.y + GOAL_HEIGHT / 2;
@@ -776,6 +812,12 @@ static void forward_shooting_logic(struct Player *player, const struct Scene *sc
             shoot(ball, target, max_velocity);
         }
     }
+
+
+    else if(scene->state == STATE_OUT && ball->possessor == player){
+        struct Player* nearest = nearest_teammate(player, scene);
+        pass(ball, nearest, max_velocity);
+    }    
 }
 
 static void defence_shooting_logic(struct Player *player, const struct Scene *scene){ (void)scene; }
@@ -815,12 +857,27 @@ static int is_ball_colliding(const struct Player* p, const struct Ball* b) {
 
     // the player should not have the ball and be in INTERCEPTING state
     if(ball->possessor == player && player->state == INTERCEPTING){
-        player->state = IDLE;
+        player->state = MOVING;
         return;
     }
 
+    // if a player can't catch the ball before reaching over a tackle counter
+    // his state will be set to IDLE
+    if(player->state == INTERCEPTING){
+        if(tacke_counters[(player->team) - 1][player->kit] >= 40){
+            player->state = IDLE;
+            tacke_counters[(player->team) - 1][player->kit] = 0;
+            return;
+        }
+
+        else{
+            tacke_counters[(player->team) - 1][player->kit]++;
+            return;
+        }
+    }
+
     // player tries to get the ball if it hits him
-    if(is_ball_colliding(player, ball) && ball->possessor != player){
+    if(is_ball_colliding(player, ball) && !player_shot[(player->team) - 1][player->kit] && ball->possessor != player){
         player->state = INTERCEPTING;
         return;
     }
@@ -849,7 +906,7 @@ static int is_ball_colliding(const struct Player* p, const struct Ball* b) {
 
         Vec2 opponent_goal = (player->team == 1) ? team2_goal : team1_goal;
         
-        float max_velocity = MAX_BALL_VELOCITY * player->talents.shooting;
+        float max_velocity = MAX_BALL_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
 
         float top_line    = opponent_goal.y - GOAL_HEIGHT / 2;
         float bottom_line = opponent_goal.y + GOAL_HEIGHT / 2;
