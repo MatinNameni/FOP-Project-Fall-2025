@@ -219,7 +219,6 @@ PlayerLogicFn get_change_state_logic(int team, int kit) {
 
 /* -------------------------------------------------------------------------
  * TALENTS
- *  TODO 2: Replace these default values with your desired skill points.
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Talents team1_talents[6] = {
@@ -249,10 +248,6 @@ struct Talents get_talents(int team, int kit) {
 
 /* -------------------------------------------------------------------------
  * Positioning
- *  TODO 3: Decide players positions at kick-off.
- *        Players must stay on their half, outside the center circle.
- *        Keep in mind that the kick-off team's first player will automatically
- *             be placed at the center of the pitch.
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Vec2 team1_positions[6] = { 
@@ -602,7 +597,7 @@ static bool verify_position(struct Player *player,  struct Scene *scene) {
  * @param scene Pointer to the current game scene.
  */
 static bool verify_collision(struct Player *player,  struct Scene *scene) {
-    float max_speed = MAX_PLAYER_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
+    float max_speed = MAX_PLAYER_VELOCITY * player->talents.agility / (float)MAX_TALENT_PER_SKILL;
     bool collision = false;
 
     for (int i = 0; i < PLAYER_COUNT; i++)
@@ -617,6 +612,8 @@ static bool verify_collision(struct Player *player,  struct Scene *scene) {
             player->velocity.x += new_vel.x;
             player->velocity.y += new_vel.y;
 
+            verify_movement(player);
+
             collision = true;
         }
 
@@ -626,6 +623,8 @@ static bool verify_collision(struct Player *player,  struct Scene *scene) {
             
             player->velocity.x += new_vel.x;
             player->velocity.y += new_vel.y;
+
+            verify_movement(player);
 
             collision = true;
         }
@@ -648,7 +647,7 @@ static void forward_movement_logic(struct Player *player,  struct Scene *scene){
     if(verify_collision(player, scene)) return;
 
     struct Ball* ball = scene->ball;
-    float max_speed = MAX_PLAYER_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
+    float max_speed = MAX_PLAYER_VELOCITY * player->talents.agility / (float)MAX_TALENT_PER_SKILL;
 
     float x_distance = ball->position.x - player->position.x;
     float y_distance = ball->position.y - player->position.y;
