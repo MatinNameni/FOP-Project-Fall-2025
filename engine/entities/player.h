@@ -8,7 +8,7 @@
 #ifndef ENGINE_ENTITIES_PLAYER_H
 #define ENGINE_ENTITIES_PLAYER_H
 
-#include <core/vec2.h>
+#include "core/vec2.h"
 
 struct Scene; // Forward declaration: The player needs to know the world exists.
 
@@ -54,17 +54,17 @@ typedef struct Player {
     const int kit;    // Individual player ID (e.g., Jersey number)
 
     /** AI: Decides HOW to move. */
-    void (*movement_logic)(struct Player *self, const struct Scene *scene);
+    void (*movement_logic)(struct Player *self, struct Scene *scene);
     
     /** AI: Decides WHERE and HOW HARD to kick. */
-    void (*shooting_logic)(struct Player *self, const struct Scene *scene);
+    void (*shooting_logic)(struct Player *self, struct Scene *scene);
     
     /** AI: Decides WHEN to switch states (e.g., from IDLE to MOVING). */
-    void (*change_state_logic)(struct Player *self, const struct Scene *scene);
+    void (*change_state_logic)(struct Player *self, struct Scene *scene);
 } Player;
 
 // Allocation functions
-struct Player make_player(float x, float y, int team, const int kit);
-struct Player *make_player_ptr(float x, float y, int team, const int kit);
+struct Player make_player(float x, float y, int team, int kit);
+struct Player *make_player_ptr(float x, float y, int team, int kit);
 
 #endif /* ENGINE_ENTITIES_PLAYER_H */
