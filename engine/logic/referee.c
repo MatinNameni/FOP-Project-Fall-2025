@@ -72,7 +72,7 @@ static bool out(float x, float y) {
     if ((top_point    > CENTER_Y + PITCH_H / 2) ||
         (bottom_point < CENTER_Y - PITCH_H / 2) ||
         (right_point  < CENTER_X - PITCH_W / 2) ||
-        (left_point   > CENTER_X + PITCH_H / 2))
+        (left_point   > CENTER_X + PITCH_W / 2))
         {
             printf("Ball is out: x=%.2f, y=%.2f\n", x, y);
             return true;
@@ -106,10 +106,10 @@ static bool out(float x, float y) {
 int referee(struct Scene* scene) {
     float ball_x = scene->ball->position.x;
     float ball_y = scene->ball->position.y;
-    int state;
 
     // check for goal
-    if (state = goal(ball_x, ball_y) != 0)
+    int state = goal(ball_x, ball_y) ;
+    if (state)
     {
         struct Team* scoring_team = (state == 1) ? scene->first_team : scene->second_team;
         scoring_team->score++;
@@ -176,8 +176,8 @@ void verify_state(struct Player *player, struct Scene *scene) {
     {
         player->state = IDLE;
 
-        printf(" ERROR: the ball is not yours, you can't shoot! (team %d, player %d)\n",
-                player->team, player->kit);
+        // printf(" ERROR: the ball is not yours, you can't shoot! (team %d, player %d)\n",
+        //        player->team, player->kit);
     }
     
 }
@@ -253,8 +253,8 @@ void verify_shoot(struct Ball *ball, bool kickoff) {
     int team = player->team;
 
     if(kickoff){
-        if ((team == 1 && ball->velocity.x < 0) || 
-            (team == 2 && ball->velocity.x > 0))
+        if ((team == 1 && ball->velocity.x > 0) || 
+            (team == 2 && ball->velocity.x < 0))
         {
             printf(" ERROR: You must pass to your own half! (team %d, player %d)\n", player->team, player->kit);
         }
