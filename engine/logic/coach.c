@@ -256,12 +256,12 @@ struct Talents get_talents(int team, int kit) {
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Vec2 team1_positions[6] = { 
-    {400, CENTER_Y},        // forward 1
-    {350, CENTER_Y-150},    // forward 2
+    {350, CENTER_Y},        // forward 1
+    {300, CENTER_Y-150},    // forward 2
     {200, CENTER_Y-75},     // defender 1
-    {50, CENTER_Y},         // gk
+    {40, CENTER_Y},         // gk
     {200, CENTER_Y+75},     // defender 2
-    {350, CENTER_Y+150},    // forward 3
+    {300, CENTER_Y+150},    // forward 3
 };
 
 /* Team 2 */
@@ -269,7 +269,7 @@ static struct Vec2 team2_positions[6] = {
     {750, CENTER_Y},        // forward 1
     {700, CENTER_Y-150},    // forward 2
     {800, CENTER_Y-75},     // defender 1
-    {950, CENTER_Y},        // gk
+    {960, CENTER_Y},        // gk
     {800, CENTER_Y+75},     // defender 2
     {700, CENTER_Y+150},    // forward 3
 };
@@ -284,22 +284,22 @@ struct Vec2 get_positions(int team, int kit) {
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Vec2 team1_preferred_positions[6] = { 
-    {750, CENTER_Y},        // forward 1
-    {850, CENTER_Y-200},    // forward 2
+    {600, CENTER_Y},        // forward 1
+    {750, CENTER_Y-200},    // forward 2
     {200, CENTER_Y-75},     // defender 1
-    {50, CENTER_Y},         // gk
+    {40, CENTER_Y},         // gk
     {200, CENTER_Y+75},     // defender 2
-    {850, CENTER_Y+200},    // forward 3
+    {750, CENTER_Y+200},    // forward 3
 };
 
 /* Team 2 */
 static struct Vec2 team2_preferred_positions[6] = { 
-    {250, CENTER_Y},        // forward 1
-    {200, CENTER_Y-200},    // forward 2
+    {400, CENTER_Y},        // forward 1
+    {300, CENTER_Y-200},    // forward 2
     {800, CENTER_Y-75},     // defender 1
-    {950, CENTER_Y},        // gk
+    {960, CENTER_Y},        // gk
     {800, CENTER_Y+75},     // defender 2
-    {200, CENTER_Y+200},    // forward 3
+    {300, CENTER_Y+200},    // forward 3
 };
 
 struct Vec2 get_preferred_positions(int team, int kit) {
