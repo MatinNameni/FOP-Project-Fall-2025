@@ -29,12 +29,16 @@ int player_shot[2][PLAYER_COUNT] = {0};
 // Used for opponent forwards to leave the penalty area
 int gk_cooldown[2] = {0};
 
+// 1 if gk has dived. 0 if not or he has recovered from last dive
+int gk_dive[2] = {0};
+
 
 #define FORWARD_SHOOTING_RANGE 80.0f
 #define FORWARD_INTERCEPTING_RANGE 200.0f
 #define PENALTY_AREA_WIDTH 75.0F
 #define PENALTY_AREA_HEIGHT GOAL_HEIGHT
 #define GK_ALERT_RANGE (PITCH_W / 2)
+#define GK_DIVE_RANGE 110.0f
 #define GK_COOLDOWN 180
 
 
@@ -109,6 +113,7 @@ static void verify_shoot(struct Ball *ball);
 static void player_shot_fill_zero();
 static void pass(struct Ball* ball, struct Player *target, float velocity);
 static void shoot(struct Ball* ball, struct Vec2 target, float velocity);
+static void post_bounce(struct Scene *scene);
 
 
 /* -------------------------------------------------------------------------
@@ -236,9 +241,9 @@ PlayerLogicFn get_change_state_logic(int team, int kit) {
 static struct Talents team1_talents[6] = {
     {3, 6, 4, 7},   // forward 1   
     {3, 7, 3, 7},   // forward 2
-    {7, 4, 3, 6},   // defender 1
+    {7, 5, 2, 6},   // defender 1
     {8, 4, 1, 7},   // gk
-    {8, 4, 3, 5},   // defender 2
+    {7, 5, 3, 5},   // defender 2
     {4, 5, 4, 7},   // forward 3
 };
 
@@ -248,7 +253,7 @@ static struct Talents team2_talents[6] = {
     {4, 5, 4, 7},   // forward 2
     {7, 5, 3, 5},   // defender 1
     {8, 4, 1, 7},   // gk
-    {8, 4, 2, 6},   // defender 2
+    {8, 5, 2, 5},   // defender 2
     {3, 7, 3, 7},   // forward 3
 };
 
@@ -803,31 +808,62 @@ static void gk_movement_logic(struct Player *player,  struct Scene *scene){
 
     // keep the ball if cooldown doesn't exceed its defined value
     if(ball->possessor == player){
+        if(gk_dive[(player->team) - 1]) gk_dive[(player->team) - 1] = 0;
+
         if(gk_cooldown[(player->team) - 1] <= GK_COOLDOWN) 
             gk_cooldown[(player->team) - 1]++;
-
-        if(!is_out(scene)){
-            struct Player* nearest = nearest_teammate(player, scene);
-            player->velocity = make_velocity_vector(player->position, nearest->position, max_speed / 3);
-        }
+        
+        struct Player* nearest = nearest_teammate(player, scene);
+        player->velocity = make_velocity_vector(player->position, nearest->position, max_speed / 3);
     }
 
     else{
+        float b_x_distance = fabs(ball->position.x - player->position.x);
+        float b_y_distance = fabs(ball->position.y - player->position.y);
+        float b_distance = hypotf(b_x_distance, b_y_distance);
+
         float o_x_distance = 999.0f;
         if(ball->possessor) o_x_distance = fabs(ball->possessor->position.x - player->position.x);
 
+        // if ball is far from gk, he will move to his preferred position
+        if(b_x_distance > GK_ALERT_RANGE) {
+            player->velocity = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed);
+        }
+
         // if ball is in penalty area without any possessor, he moves towards it
-        if(!ball->possessor && ball_in_penalty_area(ball, gk_goal)){
+        else if(!ball->possessor && ball_in_penalty_area(ball, gk_goal)){
             player->velocity = make_velocity_vector(player->position, ball->position, max_speed);
         }
 
-        // if opponent has the ball and is in a defined range, the state will be set to MOVING
-        else if(ball->last_team != player->team && o_x_distance <= GK_ALERT_RANGE){
+        // if opponent has the ball and is in a defined range, gk will choose a position for catching the ball
+        else if(ball->possessor && ball->last_team != player->team && b_distance <= GK_DIVE_RANGE && !gk_dive[(player->team) - 1]){
+            float top_line = gk_goal.y - (GOAL_HEIGHT / 2);
+
+            float random_y = (float) (rand() % (int) (GOAL_HEIGHT - 20)) + top_line + 10.0f;
+            float target_x = gk_goal.x;
+
+            Vec2 target = {
+                .x = target_x,
+                .y = random_y
+            };
+
+            player->velocity = make_velocity_vector(player->position, target, max_speed);
+
+            gk_dive[(player->team) - 1] = 1;
+        }
+
+        // if opponent has the ball and is in a defined range, gk will follow the ball vertically
+        else if(ball->last_team != player->team && o_x_distance <= GK_ALERT_RANGE && o_x_distance > GK_DIVE_RANGE){
+            if(gk_dive[(player->team) - 1]) gk_dive[(player->team) - 1] = 0;
+
             player->velocity.x = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed).x;
             player->velocity.y = make_velocity_vector(player->position, ball->position, max_speed).y;
         }
-        
-        else{
+
+        // if ball is in his team's control, he will move to his preferred position
+        else if (ball->last_team == player->team){
+            if(gk_dive[(player->team) - 1]) gk_dive[(player->team) - 1] = 0;
+            
             player->velocity = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed);
         }
     }
@@ -951,6 +987,48 @@ static void shoot(struct Ball* ball, struct Vec2 target, float velocity){
 }
 
 
+ /**
+ * @brief Ball would bounce back if it hits the post
+ */
+static void post_bounce(struct Scene *scene){
+    struct Ball* ball = scene->ball;
+
+    Vec2 team1_top_post = {
+        .x = CENTER_X - (PITCH_W / 2),
+        .y = CENTER_Y - (GOAL_HEIGHT / 2)
+    };
+
+    Vec2 team1_bottom_post = {
+        .x = CENTER_X - (PITCH_W / 2),
+        .y = CENTER_Y + (GOAL_HEIGHT / 2)
+    };
+
+    Vec2 team2_top_post = {
+        .x = CENTER_X + (PITCH_W / 2),
+        .y = CENTER_Y - (GOAL_HEIGHT / 2)
+    };
+
+    Vec2 team2_bottom_post = {
+        .x = CENTER_X + (PITCH_W / 2),
+        .y = CENTER_Y + (GOAL_HEIGHT / 2)
+    };
+
+    float t1_top_post_distance = fabs(ball->position.y - team1_top_post.y);
+    float t1_bottom_post_distance = fabs(ball->position.y - team1_bottom_post.y);
+    float t2_top_post_distance = fabs(ball->position.y - team2_top_post.y);
+    float t2_bottom_post_distance = fabs(ball->position.y - team2_bottom_post.y);
+
+    bool hit_t1_tp = (t1_top_post_distance <= BALL_RADIUS) && (ball->position.x >= team1_top_post.x && ball->position.x <= team1_top_post.x + GOAL_WIDTH);
+    bool hit_t1_bp = (t1_bottom_post_distance <= BALL_RADIUS) && (ball->position.x >= team1_bottom_post.x && ball->position.x <= team1_bottom_post.x + GOAL_WIDTH);
+    bool hit_t2_tp = (t2_top_post_distance <= BALL_RADIUS) && (ball->position.x >= team2_top_post.x && ball->position.x <= team2_top_post.x + GOAL_WIDTH);
+    bool hit_t2_bp = (t2_bottom_post_distance <= BALL_RADIUS) && (ball->position.x >= team2_bottom_post.x && ball->position.x <= team2_bottom_post.x + GOAL_WIDTH);
+
+    if(hit_t1_tp || hit_t1_bp || hit_t2_tp || hit_t2_bp){
+        ball->velocity.y *= -1.0f;
+    }
+}
+
+
 /* -------------------------------------------------------------------------
  * shooting logic functions
  * ------------------------------------------------------------------------- */
@@ -999,8 +1077,8 @@ static void forward_shooting_logic(struct Player *player,  struct Scene *scene){
             (ball->possessor && ball->possessor == player))
         {
             srand((unsigned int)time(NULL));
-            int random_y = (rand() % (int) (GOAL_HEIGHT - 10)) + top_line +  5.0f;
-            int target_x = goal_line;
+            float random_y = (float) (rand() % (int) (GOAL_HEIGHT - 10)) + top_line +  5.0f;
+            float target_x = goal_line;
             
             Vec2 target = {
                 .x = target_x,
@@ -1017,9 +1095,10 @@ static void forward_shooting_logic(struct Player *player,  struct Scene *scene){
             (player->position.y <= bottom_line) &&
             (ball->possessor && ball->possessor == player))
         {
-            srand((unsigned int)time(NULL));
-            int random_y = (rand() % (int) (GOAL_HEIGHT - 10)) + top_line + 5.0f;
-            int target_x = goal_line;
+            int memory_seed;
+            srand((unsigned int)time(NULL) ^ (unsigned int)&memory_seed);
+            float random_y = (float) (rand() % (int) (GOAL_HEIGHT - 10)) + top_line + 5.0f;
+            float target_x = goal_line;
             
             Vec2 target = {
                 .x = target_x,
@@ -1244,6 +1323,11 @@ static void gk_change_state_logic(struct Player *player,  struct Scene *scene){
         // if ball is near gk, he tries to catch it
         if(is_ball_colliding(player, ball) && !player_shot[(player->team) - 1][player->kit] && ball->possessor != player)
             player->state = INTERCEPTING;
+
+        // if ball is far from gk, his state will be set to MOVING
+        else if(b_x_distance > GK_ALERT_RANGE) {
+            player->state = MOVING;
+        }
 
         // if ball is in penalty area without any possessor, he moves towards it
         else if(!ball->possessor && ball_in_penalty_area(ball, gk_goal))
