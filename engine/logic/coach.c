@@ -25,8 +25,17 @@ int tacke_counters[2][PLAYER_COUNT] = {0};
 int player_shot[2][PLAYER_COUNT] = {0};
 
 
+// gk holding ball cooldown.
+// Used for opponent forwards to leave the penalty area
+int gk_cooldown[2] = {0};
+
+
 #define FORWARD_SHOOTING_RANGE 80.0f
 #define FORWARD_INTERCEPTING_RANGE 200.0f
+#define PENALTY_AREA_WIDTH 75.0F
+#define PENALTY_AREA_HEIGHT GOAL_HEIGHT
+#define GK_ALERT_RANGE (PITCH_W / 2)
+#define GK_COOLDOWN 180
 
 
 /* -------------------------------------------------------------------------
@@ -66,6 +75,9 @@ static int is_ball_colliding(const struct Player* p, const struct Ball* b) ;
 static bool is_kickoff(struct Scene *scene);
 static bool is_out(struct Scene *scene);
 static Vec2 get_opponent_goal(struct Player* player);
+static Vec2 get_own_goal(struct Player* player);
+static bool ball_in_penalty_area(struct Ball *ball, Vec2 goal);
+static bool player_in_penalty_area(struct Player *player, Vec2 goal);
 
 
 /* -------------------------------------------------------------------------
@@ -122,7 +134,7 @@ static void gk_change_state_logic(struct Player *player,  struct Scene *scene);
 void movement_logic_1_0(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_1_1(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_1_2(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
-void movement_logic_1_3(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
+void movement_logic_1_3(struct Player *self, struct Scene *scene) { gk_movement_logic(self, scene); }
 void movement_logic_1_4(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_1_5(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 
@@ -130,7 +142,7 @@ void movement_logic_1_5(struct Player *self, struct Scene *scene) { forward_move
 void movement_logic_2_0(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_2_1(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_2_2(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
-void movement_logic_2_3(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
+void movement_logic_2_3(struct Player *self, struct Scene *scene) { gk_movement_logic(self, scene); }
 void movement_logic_2_4(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_2_5(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 
@@ -138,7 +150,7 @@ void movement_logic_2_5(struct Player *self, struct Scene *scene) { forward_move
 void shooting_logic_1_0(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_1_1(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_1_2(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
-void shooting_logic_1_3(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
+void shooting_logic_1_3(struct Player *self, struct Scene *scene) { gk_shooting_logic(self, scene); }
 void shooting_logic_1_4(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_1_5(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 
@@ -146,7 +158,7 @@ void shooting_logic_1_5(struct Player *self, struct Scene *scene) { forward_shoo
 void shooting_logic_2_0(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_2_1(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_2_2(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
-void shooting_logic_2_3(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
+void shooting_logic_2_3(struct Player *self, struct Scene *scene) { gk_shooting_logic(self, scene); }
 void shooting_logic_2_4(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_2_5(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 
@@ -154,7 +166,7 @@ void shooting_logic_2_5(struct Player *self, struct Scene *scene) { forward_shoo
 void change_state_logic_1_0(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_1_1(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_1_2(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
-void change_state_logic_1_3(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
+void change_state_logic_1_3(struct Player *self, struct Scene *scene) { gk_change_state_logic(self, scene); }
 void change_state_logic_1_4(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_1_5(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 
@@ -162,7 +174,7 @@ void change_state_logic_1_5(struct Player *self, struct Scene *scene) { forward_
 void change_state_logic_2_0(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_2_1(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_2_2(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
-void change_state_logic_2_3(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
+void change_state_logic_2_3(struct Player *self, struct Scene *scene) { gk_change_state_logic(self, scene); }
 void change_state_logic_2_4(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_2_5(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 
@@ -225,7 +237,7 @@ static struct Talents team1_talents[6] = {
     {3, 6, 4, 7},   // forward 1   
     {3, 7, 3, 7},   // forward 2
     {7, 4, 3, 6},   // defender 1
-    {8, 3, 2, 7},   // gk
+    {8, 4, 1, 7},   // gk
     {8, 4, 3, 5},   // defender 2
     {4, 5, 4, 7},   // forward 3
 };
@@ -235,7 +247,7 @@ static struct Talents team2_talents[6] = {
     {2, 6, 4, 8},   // forward 1
     {4, 5, 4, 7},   // forward 2
     {7, 5, 3, 5},   // defender 1
-    {8, 3, 2, 7},   // gk
+    {8, 4, 1, 7},   // gk
     {8, 4, 2, 6},   // defender 2
     {3, 7, 3, 7},   // forward 3
 };
@@ -424,6 +436,55 @@ static Vec2 get_opponent_goal(struct Player* player){
     Vec2 opponent_goal = (player->team == 1) ? team2_goal : team1_goal;
 
     return opponent_goal;
+}
+
+
+ /**
+ * @brief Internal helper to find player's own goal.
+ * @return The position of the center of player's own goal line.
+ */
+static Vec2 get_own_goal(struct Player* player){
+    Vec2 team1_goal = {
+        .x = CENTER_X - PITCH_W / 2,
+        .y = CENTER_Y
+    };
+
+    Vec2 team2_goal = {
+        .x = CENTER_X + PITCH_W / 2,
+        .y = CENTER_Y
+    };
+
+    Vec2 own_goal = (player->team == 1) ? team1_goal : team2_goal;
+
+    return own_goal;
+}
+
+
+ /**
+ * @brief Internal helper to check if ball is in penalty area.
+ */
+static bool ball_in_penalty_area(struct Ball *ball, Vec2 goal){
+    float abs_x_distance = fabs(ball->position.x - goal.x);
+    float abs_y_distance = fabs(ball->position.y - goal.y);
+
+    if(abs_x_distance <= PENALTY_AREA_WIDTH && abs_y_distance <= PENALTY_AREA_HEIGHT / 2)
+        return true;
+
+    return false;
+}
+
+
+ /**
+ * @brief Internal helper to check if the player is in penalty area.
+ */
+static bool player_in_penalty_area(struct Player *player, Vec2 goal){
+    float abs_x_distance = (player->team == 1) ? fabs((player->position.x - BALL_RADIUS) - goal.x) : fabs((player->position.x + BALL_RADIUS) - goal.x);
+    float abs_y_distance = (player->position.y - goal.y > 0) ? fabs((player->position.y + BALL_RADIUS) - goal.y) : fabs((player->position.y - BALL_RADIUS) - goal.y);
+
+    if(abs_x_distance <= PENALTY_AREA_WIDTH && abs_y_distance <= PENALTY_AREA_HEIGHT / 2)
+        return true;
+
+    return false;
 }
 
 
@@ -729,6 +790,47 @@ static void gk_movement_logic(struct Player *player,  struct Scene *scene){
     verify_movement(player);
     if(verify_position(player, scene)) return;
     if(verify_collision(player, scene)) return;
+
+    struct Ball* ball = scene->ball;
+    Vec2 gk_goal = get_own_goal(player);
+    float max_speed = MAX_PLAYER_VELOCITY * player->talents.agility / (float)MAX_TALENT_PER_SKILL;
+
+    // gk always should be in the penalty area 
+    if(!player_in_penalty_area(player, gk_goal) && ball->possessor != player){
+        player->velocity = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed);
+        return;
+    }
+
+    // keep the ball if cooldown doesn't exceed its defined value
+    if(ball->possessor == player){
+        if(gk_cooldown[(player->team) - 1] <= GK_COOLDOWN) 
+            gk_cooldown[(player->team) - 1]++;
+
+        if(!is_out(scene)){
+            struct Player* nearest = nearest_teammate(player, scene);
+            player->velocity = make_velocity_vector(player->position, nearest->position, max_speed / 3);
+        }
+    }
+
+    else{
+        float o_x_distance = 999.0f;
+        if(ball->possessor) o_x_distance = fabs(ball->possessor->position.x - player->position.x);
+
+        // if ball is in penalty area without any possessor, he moves towards it
+        if(!ball->possessor && ball_in_penalty_area(ball, gk_goal)){
+            player->velocity = make_velocity_vector(player->position, ball->position, max_speed);
+        }
+
+        // if opponent has the ball and is in a defined range, the state will be set to MOVING
+        else if(ball->last_team != player->team && o_x_distance <= GK_ALERT_RANGE){
+            player->velocity.x = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed).x;
+            player->velocity.y = make_velocity_vector(player->position, ball->position, max_speed).y;
+        }
+        
+        else{
+            player->velocity = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed);
+        }
+    }
 }
 
 
@@ -934,11 +1036,29 @@ static void forward_shooting_logic(struct Player *player,  struct Scene *scene){
  */
 static void defender_shooting_logic(struct Player *player,  struct Scene *scene){ (void)scene; }
 
-
 /**
  * @brief Shooting logic for goalkeeper
  */
-static void gk_shooting_logic(struct Player *player,  struct Scene *scene){ (void)scene; }
+static void gk_shooting_logic(struct Player *player,  struct Scene *scene){ 
+    struct Ball* ball = scene->ball;
+    Vec2 gk_goal = get_own_goal(player);
+    float max_speed = MAX_BALL_VELOCITY * player->talents.shooting / (float)MAX_TALENT_PER_SKILL;
+
+    // gk always should be in the penalty area 
+    if(!player_in_penalty_area(player, gk_goal) && ball->possessor == player){
+        struct Player* nearest = nearest_teammate(player, scene);
+        pass(ball, nearest, max_speed);
+        return;
+    }
+
+    // if gk has the ball, he clears it
+    if(ball->possessor == player && gk_cooldown[(player->team) - 1] > GK_COOLDOWN){
+        gk_cooldown[(player->team) - 1] = 0;
+
+        struct Player* nearest = nearest_teammate(player, scene);
+        pass(ball, nearest, max_speed);
+    }
+ }
 
 
 /* -------------------------------------------------------------------------
@@ -1079,4 +1199,65 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
 /**
  * @brief Change state logic for goalkeeper
  */
-static void gk_change_state_logic(struct Player *player,  struct Scene *scene){ (void)scene; }
+static void gk_change_state_logic(struct Player *player,  struct Scene *scene){ 
+    struct Ball* ball = scene->ball;
+    Vec2 gk_goal = get_own_goal(player);
+
+    // the player should not shoot while he doesn't have the ball
+    if(ball->possessor != player && player->state == SHOOTING){
+        player->state = IDLE;
+        return;
+    }
+
+    // the player should not have the ball and be in INTERCEPTING state
+    if(ball->possessor == player && player->state == INTERCEPTING){
+        player->state = MOVING;
+        return;
+    }
+
+    // if gk is outside the penalty area he should get back inside the goal immediately
+    if(!player_in_penalty_area(player, gk_goal)){
+        if(ball->possessor == player) player->state = SHOOTING;
+
+        else player->state = MOVING;
+
+        return;
+    }
+
+    // if gk has the ball, he clears it
+    if(ball->possessor == player && gk_cooldown[(player->team) - 1] > GK_COOLDOWN){
+        player->state = SHOOTING;
+    }
+
+    else{
+        float b_x_distance = ball->position.x - player->position.x;
+        float b_y_distance = ball->position.y - player->position.y;
+        float b_distance = hypotf(b_x_distance, b_y_distance);
+
+        float pp_x_distance = get_preferred_positions(player->team, player->kit).x - player->position.x;
+        float pp_y_distance = get_preferred_positions(player->team, player->kit).y - player->position.y;
+        float pp_distance = hypotf(b_x_distance, b_y_distance);
+
+        float o_x_distance = 999.0f;
+        if(ball->possessor) o_x_distance = fabs(ball->possessor->position.x - player->position.x);
+
+        // if ball is near gk, he tries to catch it
+        if(is_ball_colliding(player, ball) && !player_shot[(player->team) - 1][player->kit] && ball->possessor != player)
+            player->state = INTERCEPTING;
+
+        // if ball is in penalty area without any possessor, he moves towards it
+        else if(!ball->possessor && ball_in_penalty_area(ball, gk_goal))
+            player->state = MOVING;
+
+        // if opponent has the ball and is in a defined range, the state will be set to MOVING
+        else if(ball->last_team != player->team && o_x_distance <= GK_ALERT_RANGE)
+            player->state = MOVING;
+
+        // if he is in preferred position and has nothing else to do, his state will be set to IDLE
+        else if(pp_distance <= 0.5f && ball->possessor != player)
+            player->state = IDLE;
+        
+        else
+            player->state = MOVING;
+    }
+}
