@@ -52,7 +52,7 @@ int defender_tackled[2][PLAYER_COUNT] = {0};
 #define GK_COOLDOWN 180
 #define PATH_BLOCK_T 180
 #define DEFENDER_PASS_BACK_DISTANCE 50.0f
-#define PASS_RANGE PITCH_W / 4
+#define PASS_RANGE PITCH_W / 5
 #define DEFENDER_RECOVERY_COOLDOWN 120
 
 
@@ -157,7 +157,7 @@ void movement_logic_1_0(struct Player *self, struct Scene *scene) { forward_move
 void movement_logic_1_1(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_1_2(struct Player *self, struct Scene *scene) { defender_movement_logic(self, scene); }
 void movement_logic_1_3(struct Player *self, struct Scene *scene) { gk_movement_logic(self, scene); }
-void movement_logic_1_4(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
+void movement_logic_1_4(struct Player *self, struct Scene *scene) { defender_movement_logic(self, scene); }
 void movement_logic_1_5(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 
 /* Team 2 movement logic */
@@ -165,7 +165,7 @@ void movement_logic_2_0(struct Player *self, struct Scene *scene) { forward_move
 void movement_logic_2_1(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_2_2(struct Player *self, struct Scene *scene) { defender_movement_logic(self, scene); }
 void movement_logic_2_3(struct Player *self, struct Scene *scene) { gk_movement_logic(self, scene); }
-void movement_logic_2_4(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
+void movement_logic_2_4(struct Player *self, struct Scene *scene) { defender_movement_logic(self, scene); }
 void movement_logic_2_5(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 
 /* Team 1 shooting logic */
@@ -173,7 +173,7 @@ void shooting_logic_1_0(struct Player *self, struct Scene *scene) { forward_shoo
 void shooting_logic_1_1(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_1_2(struct Player *self, struct Scene *scene) { defender_shooting_logic(self, scene); }
 void shooting_logic_1_3(struct Player *self, struct Scene *scene) { gk_shooting_logic(self, scene); }
-void shooting_logic_1_4(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
+void shooting_logic_1_4(struct Player *self, struct Scene *scene) { defender_shooting_logic(self, scene); }
 void shooting_logic_1_5(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 
 /* Team 2 shooting logic */
@@ -181,7 +181,7 @@ void shooting_logic_2_0(struct Player *self, struct Scene *scene) { forward_shoo
 void shooting_logic_2_1(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 void shooting_logic_2_2(struct Player *self, struct Scene *scene) { defender_shooting_logic(self, scene); }
 void shooting_logic_2_3(struct Player *self, struct Scene *scene) { gk_shooting_logic(self, scene); }
-void shooting_logic_2_4(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
+void shooting_logic_2_4(struct Player *self, struct Scene *scene) { defender_shooting_logic(self, scene); }
 void shooting_logic_2_5(struct Player *self, struct Scene *scene) { forward_shooting_logic(self, scene); }
 
 /* Team 1 change_state logic */
@@ -189,7 +189,7 @@ void change_state_logic_1_0(struct Player *self, struct Scene *scene) { forward_
 void change_state_logic_1_1(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_1_2(struct Player *self, struct Scene *scene) { defender_change_state_logic(self, scene); }
 void change_state_logic_1_3(struct Player *self, struct Scene *scene) { gk_change_state_logic(self, scene); }
-void change_state_logic_1_4(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
+void change_state_logic_1_4(struct Player *self, struct Scene *scene) { defender_change_state_logic(self, scene); }
 void change_state_logic_1_5(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 
 /* Team 2 change_state logic */
@@ -197,7 +197,7 @@ void change_state_logic_2_0(struct Player *self, struct Scene *scene) { forward_
 void change_state_logic_2_1(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 void change_state_logic_2_2(struct Player *self, struct Scene *scene) { defender_change_state_logic(self, scene); }
 void change_state_logic_2_3(struct Player *self, struct Scene *scene) { gk_change_state_logic(self, scene); }
-void change_state_logic_2_4(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
+void change_state_logic_2_4(struct Player *self, struct Scene *scene) { defender_change_state_logic(self, scene); }
 void change_state_logic_2_5(struct Player *self, struct Scene *scene) { forward_change_state_logic(self, scene); }
 
 /* -------------------------------------------------------------------------
@@ -258,9 +258,9 @@ PlayerLogicFn get_change_state_logic(int team, int kit) {
 static struct Talents team1_talents[6] = {
     {3, 6, 4, 7},   // forward 1   
     {3, 7, 3, 7},   // forward 2
-    {7, 5, 2, 6},   // defender 1
+    {7, 5, 1, 7},   // defender 1
     {8, 4, 1, 7},   // gk
-    {7, 5, 3, 5},   // defender 2
+    {7, 5, 2, 6},   // defender 2
     {4, 5, 4, 7},   // forward 3
 };
 
@@ -268,9 +268,9 @@ static struct Talents team1_talents[6] = {
 static struct Talents team2_talents[6] = {
     {2, 6, 4, 8},   // forward 1
     {4, 5, 4, 7},   // forward 2
-    {7, 5, 3, 5},   // defender 1
+    {7, 5, 2, 6},   // defender 1
     {8, 4, 1, 7},   // gk
-    {8, 5, 2, 5},   // defender 2
+    {8, 5, 1, 6},   // defender 2
     {3, 7, 3, 7},   // forward 3
 };
 
@@ -313,7 +313,7 @@ struct Vec2 get_positions(int team, int kit) {
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Vec2 team1_preferred_positions[6] = { 
-    {600, CENTER_Y},        // forward 1
+    {400, CENTER_Y},        // forward 1
     {750, CENTER_Y-200},    // forward 2
     {200, CENTER_Y-75},     // defender 1
     {40, CENTER_Y},         // gk
@@ -323,7 +323,7 @@ static struct Vec2 team1_preferred_positions[6] = {
 
 /* Team 2 */
 static struct Vec2 team2_preferred_positions[6] = { 
-    {400, CENTER_Y},        // forward 1
+    {600, CENTER_Y},        // forward 1
     {300, CENTER_Y-200},    // forward 2
     {800, CENTER_Y-75},     // defender 1
     {960, CENTER_Y},        // gk
@@ -923,13 +923,19 @@ static void forward_movement_logic(struct Player *player,  struct Scene *scene){
         // if ball is in his team's control he goes back to the opponent's half
         if(ball->last_team == player->team)
         {
-            player->velocity = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed);
+            if(!ball->possessor && distance <= FORWARD_INTERCEPTING_RANGE){
+                player->velocity = make_velocity_vector(player->position, ball->position, max_speed);
+            }
+            
+            else{
+                player->velocity = make_velocity_vector(player->position, get_preferred_positions(player->team, player->kit), max_speed);
+            }
         }
 
         else
         {
             // get the ball if opponent is in a defined range
-            if (distance <= 100.0f){
+            if (distance <= FORWARD_INTERCEPTING_RANGE && (player->position.x - CENTER_X) * (get_own_goal(player).x - CENTER_X) <= 0){
                 player->velocity = make_velocity_vector(player->position, ball->position, max_speed);
 
                 return;
@@ -1003,9 +1009,11 @@ static void defender_movement_logic(struct Player *player,  struct Scene *scene)
             float middle_x = (ball->possessor->position.x + own_goal.x) / 2;
             float middle_y = (ball->possessor->position.y + own_goal.y) / 2;
 
+            float offset = (player->kit == 2) ? -30.0f : 30.0f;
+
             Vec2 target = {
                 .x = middle_x,
-                .y = middle_y
+                .y = middle_y + offset
             };
 
             player->velocity = make_velocity_vector(player->position, target, max_velocity);
@@ -1167,8 +1175,8 @@ static void pass(struct Ball* ball, struct Player *target, float velocity){
     float distance = hypotf(x_distance, y_distance);
 
     Vec2 new_vel = {
-        .x =  (x_distance / distance) * velocity,
-        .y = (y_distance / distance) * velocity
+        .x =  (x_distance / distance) * velocity * 1.3,
+        .y = (y_distance / distance) * velocity * 1.3
     };
 
     ball->velocity.x = new_vel.x;
@@ -1191,8 +1199,8 @@ static void shoot(struct Ball* ball, struct Vec2 target, float velocity){
     float distance = hypotf(x_distance, y_distance);
 
     Vec2 new_vel = {
-        .x =  (x_distance / distance) * velocity,
-        .y = (y_distance / distance) * velocity
+        .x =  (x_distance / distance) * velocity * 1.4,
+        .y = (y_distance / distance) * velocity * 1.4
     };
 
     ball->velocity.x = new_vel.x;
@@ -1328,7 +1336,7 @@ static void forward_shooting_logic(struct Player *player,  struct Scene *scene){
 }
 
 /**
- * @brief Shooting logic for denfender
+ * @brief Shooting logic for defender
  */
 static void defender_shooting_logic(struct Player *player,  struct Scene *scene){ 
     struct Ball* ball = scene->ball;
@@ -1544,9 +1552,17 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
             float b_distance = hypotf(b_x_distance, b_y_distance);
 
             if(pp_distance < 0.1f){
-                if(ball->last_team == player->team) player->state = IDLE;
+                if(ball->last_team == player->team) {
+                    if(!ball->possessor && b_distance <= FORWARD_INTERCEPTING_RANGE) player->state = MOVING;
+                    else player->state = IDLE;
+                }
 
-                else if(b_distance <= FORWARD_INTERCEPTING_RANGE) player->state = MOVING;
+                else if(b_distance <= FORWARD_INTERCEPTING_RANGE){
+                    Vec2 own_goal = get_own_goal(player);
+                    if((player->position.x - CENTER_X) * (own_goal.x - CENTER_X) <= 0){
+                        player->state = MOVING;
+                    }
+                }
                 
                 else if((ball->last_team != player->team) &&
                         (   (player->team == 1 && ball->position.x < CENTER_X) ||
@@ -1583,14 +1599,13 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
 
     // tackle cooldown
     if (tackle_cooldowns[(player->team) - 1][player->kit] > 0) {
+        if(tackle_cooldowns[(player->team) - 1][player->kit] == 1){
+            defender_tackled[(player->team) - 1][player->kit] = 0;
+        }
+
         tackle_cooldowns[(player->team) - 1][player->kit]--;
         player->state = IDLE;
         return;
-    }
-
-    // defender recovered from tackle
-    if(tackle_cooldowns[(player->team) - 1][player->kit] == 0){
-        defender_tackled[(player->team) - 1][player->kit] = 0;
     }
 
     // logic for triggering a failed tackle
