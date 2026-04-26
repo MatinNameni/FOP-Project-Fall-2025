@@ -19,10 +19,6 @@ bool coach_both_teams = false;
 int tackle_cooldowns[2][PLAYER_COUNT] = {0};
 
 
-// 1 if player just shot.
-int player_shot[2][PLAYER_COUNT] = {0};
-
-
 // gk holding ball cooldown.
 // Used for opponent forwards to leave the penalty area
 int gk_cooldown[2] = {0};
@@ -38,6 +34,10 @@ int defender_tackled[2][PLAYER_COUNT] = {0};
 
 //true if forward shot the ball towards the opponent goal, false otherwise.
 bool ball_shot_towards_opponent_goal = false;
+
+// pass timer
+Player* last_ball_possessor = NULL;
+time_t last_pass_time;
 
 
 #define FORWARD_SHOOTING_RANGE 100.0f
@@ -57,6 +57,7 @@ bool ball_shot_towards_opponent_goal = false;
 #define FORWARD_PANIC_ZONE (PLAYER_RADIUS * 2 + 20.0f)
 #define FORWARD_ATTACK_ZONE 140.0f
 #define NOT_AVAILABLE_HEIGHT (PLAYER_RADIUS + BALL_RADIUS + 5.0f)
+#define PASS_COOLDOWN 1
 
 
 /* -------------------------------------------------------------------------
@@ -134,7 +135,6 @@ static void gk_movement_logic(struct Player *self,  struct Scene *scene);
  * ------------------------------------------------------------------------- */
 
 static void verify_shoot(struct Ball *ball);
-static void player_shot_fill_zero();
 static void pass(struct Ball* ball, struct Player *target, float velocity);
 static void shoot(struct Ball* ball, struct Vec2 target, float velocity);
 static void post_bounce(struct Scene *scene);
@@ -1028,7 +1028,7 @@ static void forward_movement_logic(struct Player *player,  struct Scene *scene){
     {
         // if no one has the ball and it's in a defined range he tries to catch it
         if(!ball->possessor){
-            if(distance <= FORWARD_INTERCEPTING_RANGE && !player_shot[(player->team) - 1][player->kit]){
+            if(distance <= FORWARD_INTERCEPTING_RANGE){
                 player->velocity = make_velocity_vector(player->position, ball->position, max_speed);
 
                 return;
@@ -1329,22 +1329,6 @@ static void verify_shoot(struct Ball *ball) {
 }
 
 
-/**
- * @brief Changes every player_shot elements to zero
- */
-static void player_shot_fill_zero(){
-    for (int i = 0; i < 2; i++)
-    {
-        for (int j = 0; j < PLAYER_COUNT; j++)
-        {
-            player_shot[i][j] = 0;
-        }
-        
-    }
- 
-}
-
-
  /**
  * @brief Changes ball velocity vector towards the target player
  */
@@ -1357,15 +1341,13 @@ static void pass(struct Ball* ball, struct Player *target, float velocity){
         .x =  (x_distance / distance) * velocity,
         .y = (y_distance / distance) * velocity
     };
+    
+    // setting pass timer
+    last_ball_possessor = ball->possessor;
+    time(&last_pass_time);
 
     ball->velocity.x = new_vel.x;
     ball->velocity.y = new_vel.y;
-
-    // setting player player_shot to 1
-    player_shot_fill_zero();
-    int t_idx = ball->possessor->team - 1;
-    int p_idx = ball->possessor->kit;
-    player_shot[t_idx][p_idx] = 1;
 }
 
 
@@ -1382,14 +1364,12 @@ static void shoot(struct Ball* ball, struct Vec2 target, float velocity){
         .y = (y_distance / distance) * velocity
     };
 
+    // setting pass timer
+    last_ball_possessor = ball->possessor;
+    time(&last_pass_time);
+
     ball->velocity.x = new_vel.x;
     ball->velocity.y = new_vel.y;
-
-    // setting player's player_shot to 1
-    player_shot_fill_zero();
-    int t_idx = ball->possessor->team - 1;
-    int p_idx = ball->possessor->kit;
-    player_shot[t_idx][p_idx] = 1;
 }
 
 
@@ -1713,7 +1693,10 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
     }
 
     // player tries to get the ball if it hits him
-    if(is_ball_colliding(player, ball) && !player_shot[(player->team) - 1][player->kit] && ball->possessor != player){
+    if(is_ball_colliding(player, ball) && ball->possessor != player){
+        if(last_ball_possessor == player && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
+            return;
+
         player->state = INTERCEPTING;
         ball_shot_towards_opponent_goal = false;
         return;
@@ -1775,7 +1758,6 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
 
         // if someone is blocking attacker's path and he's not near the opponent's goal, his state will be set to SHOOTING
         else if(ball->possessor == player){
-            player_shot_fill_zero();
             struct Player **opponents = (player->team == 1) ? scene->second_team->players : scene->first_team->players;
             for (int i = 0; i < PLAYER_COUNT; i++)
             {
@@ -1877,14 +1859,16 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
     }
 
     // if ball is near the player, he tries to catch it
-    if(is_ball_colliding(player, ball) && !player_shot[(player->team) - 1][player->kit] && ball->possessor != player){
-            player->state = INTERCEPTING;
-            ball_shot_towards_opponent_goal = false;
+    if(is_ball_colliding(player, ball) && ball->possessor != player){
+        if(last_ball_possessor == player && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
+            return;
+
+        player->state = INTERCEPTING;
+        ball_shot_towards_opponent_goal = false;
     }
 
     // if player has the ball he tries to pass it to the nearest available forward
     else if(ball->possessor == player){
-        player_shot_fill_zero();
         struct Player *attackers[3];
         if(player->team == 1){
             attackers[0] = scene->first_team->players[0];
@@ -1986,7 +1970,10 @@ static void gk_change_state_logic(struct Player *player,  struct Scene *scene){
         if(ball->possessor) o_x_distance = fabs(ball->possessor->position.x - player->position.x);
 
         // if ball is near gk, he tries to catch it
-        if(is_ball_colliding(player, ball) && !player_shot[(player->team) - 1][player->kit] && ball->possessor != player){
+        if(is_ball_colliding(player, ball) && ball->possessor != player){
+            if(last_ball_possessor == player && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
+                return;
+
             player->state = INTERCEPTING;
             ball_shot_towards_opponent_goal = false;
         }
