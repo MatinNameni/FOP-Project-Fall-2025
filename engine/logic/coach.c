@@ -41,12 +41,13 @@ time_t last_pass_time;
 
 
 #define FORWARD_SHOOTING_RANGE 100.0f
+#define FORWARD_SHOOTING_MARGIN 40
 #define FORWARD_INTERCEPTING_RANGE 100.0f
 #define TACKLE_COOLDOWN 90
 #define PENALTY_AREA_WIDTH 75.0F
 #define PENALTY_AREA_HEIGHT (GOAL_HEIGHT + 40)
 #define GK_ALERT_RANGE (PITCH_W / 2)
-#define GK_DIVE_RANGE 120.0f
+#define GK_DIVE_RANGE 130.0f
 #define GK_COOLDOWN 180
 #define PATH_BLOCK_T 180
 #define DEFENDER_PASS_BACK_DISTANCE 50.0f
@@ -182,7 +183,7 @@ void shooting_logic_1_0(struct Player *self, struct Scene *scene) {
     Vec2 opponent_goal = get_opponent_goal(self);
 
     // pass the ball to one of the other forwards
-    if(ball->possessor == self && fabs(self->position.x - opponent_goal.x) > FORWARD_ATTACK_ZONE && self->position.x - CENTER_X > 60.0f){
+    if(ball->possessor == self && fabs(self->position.x - opponent_goal.x) > FORWARD_ATTACK_ZONE && self->position.x - CENTER_X > 40.0f){
         struct Player* other_forwards[] = {scene->first_team->players[1], scene->first_team->players[5]};
 
         for(int i = 0; i < 2; i++){
@@ -193,7 +194,9 @@ void shooting_logic_1_0(struct Player *self, struct Scene *scene) {
             }
         }
 
-        pass(ball, other_forwards[0], max_velocity);
+        srand(time(NULL));
+        int random_index = rand() % 2;
+        pass(ball, other_forwards[random_index], max_velocity);
     }
     
     else{
@@ -213,7 +216,7 @@ void shooting_logic_2_0(struct Player *self, struct Scene *scene) {
     Vec2 opponent_goal = get_opponent_goal(self);
 
     // pass the ball to one of the other forwards
-    if(ball->possessor == self && fabs(self->position.x - opponent_goal.x) > FORWARD_ATTACK_ZONE && self->position.x - CENTER_X < -60.0f){
+    if(ball->possessor == self && fabs(self->position.x - opponent_goal.x) > FORWARD_ATTACK_ZONE && self->position.x - CENTER_X < -40.0f){
         struct Player* other_forwards[] = {scene->second_team->players[1], scene->second_team->players[5]};
 
         for(int i = 0; i < 2; i++){
@@ -224,7 +227,9 @@ void shooting_logic_2_0(struct Player *self, struct Scene *scene) {
             }
         }
 
-        pass(ball, other_forwards[0], max_velocity);
+        srand(time(NULL));
+        int random_index = rand() % 2;
+        pass(ball, other_forwards[random_index], max_velocity);
     }
     
     else{
@@ -1462,7 +1467,7 @@ static void forward_shooting_logic(struct Player *player,  struct Scene *scene){
 
         // if the player is near the opponent's goal, he shoots the ball towards the goal
         if ((player->team) == 1 &&
-            (player->position.x >= other_line) &&
+            (player->position.x >= other_line - FORWARD_SHOOTING_MARGIN) &&
             (player->position.x <= goal_line) &&
             (player->position.y >= top_line) &&
             (player->position.y <= bottom_line) &&
@@ -1482,7 +1487,7 @@ static void forward_shooting_logic(struct Player *player,  struct Scene *scene){
         }
 
         else if ((player->team) == 2 &&
-            (player->position.x <= other_line) &&
+            (player->position.x <= other_line + FORWARD_SHOOTING_MARGIN) &&
             (player->position.x >= goal_line) &&
             (player->position.y >= top_line) &&
             (player->position.y <= bottom_line) &&
@@ -1733,9 +1738,13 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
         float goal_line     = opponent_goal.x;
         float other_line    = (player->team == 1) ? goal_line - FORWARD_SHOOTING_RANGE : goal_line + FORWARD_SHOOTING_RANGE;
 
+        // randomizing where player would shoot the ball
+        srand((unsigned int)time(NULL));
+        float margin = (float) (rand() % FORWARD_SHOOTING_MARGIN);
+
         // if the player is near the opponent's goal, his state wil be set to SHOOTING
         if ((player->team == 1) &&
-            (player->position.x >= other_line) &&
+            (player->position.x >= other_line - margin) &&
             (player->position.x <= goal_line) &&
             (player->position.y >= top_line) &&
             (player->position.y <= bottom_line) &&
@@ -1746,7 +1755,7 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
         }
 
         else if ((player->team == 2) &&
-                (player->position.x <= other_line) &&
+                (player->position.x <= other_line + margin) &&
                 (player->position.x >= goal_line) &&
                 (player->position.y >= top_line) &&
                 (player->position.y <= bottom_line) &&
@@ -1821,7 +1830,7 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
     struct Ball* ball = scene->ball;
 
     // if opponent shoot the ball towards defender's own goal, he leaves the rest of the work to goalkeeper
-    if(ball_shot_towards_opponent_goal && fabs(ball->position.x - get_own_goal(player).x) - BALL_RADIUS <= FORWARD_SHOOTING_RANGE){
+    if(ball_shot_towards_opponent_goal && fabs(ball->position.x - get_own_goal(player).x) - BALL_RADIUS <= FORWARD_SHOOTING_RANGE + FORWARD_SHOOTING_MARGIN){
         player->state = IDLE;
         return;
     }
@@ -1973,9 +1982,20 @@ static void gk_change_state_logic(struct Player *player,  struct Scene *scene){
         if(is_ball_colliding(player, ball) && ball->possessor != player){
             if(last_ball_possessor == player && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
                 return;
-
-            player->state = INTERCEPTING;
-            ball_shot_towards_opponent_goal = false;
+            
+            if(ball_shot_towards_opponent_goal){
+                // randomizing gk's dive success
+                int pseudo_random_number = last_pass_time % 3;
+                if(pseudo_random_number == 1){
+                    player->state = IDLE;
+                } else {
+                    player->state = INTERCEPTING;
+                    ball_shot_towards_opponent_goal = false;
+                }
+            } else {
+                player->state = INTERCEPTING;
+                ball_shot_towards_opponent_goal = false;
+            }
         }
 
         // if ball is far from gk, his state will be set to MOVING
