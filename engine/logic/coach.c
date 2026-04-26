@@ -12,7 +12,7 @@
 
 // Set to false to let the other team use their own logic (if you implement it)
 // Set to true to test your logic on both teams
-bool coach_both_teams = true;
+bool coach_both_teams = false;
 
 
 // cooldown after tackle so that the player doesn't tackle for a while
@@ -50,12 +50,12 @@ bool ball_shot_towards_opponent_goal = false;
 #define GK_COOLDOWN 180
 #define PATH_BLOCK_T 180
 #define DEFENDER_PASS_BACK_DISTANCE 50.0f
-#define PASS_RANGE PITCH_W / 5
+#define PASS_RANGE PITCH_W / 7
 #define DEFENDER_RECOVERY_COOLDOWN 120
 #define DEFENDER_PANIC_ZONE 50.0f
 #define FORWARD_RECOVERY_COOLDOWN 90
 #define FORWARD_PANIC_ZONE (PLAYER_RADIUS * 2 + 20.0f)
-#define FORWARD_ATTACK_ZONE 120.0f
+#define FORWARD_ATTACK_ZONE 140.0f
 #define NOT_AVAILABLE_HEIGHT (PLAYER_RADIUS + BALL_RADIUS + 5.0f)
 
 
@@ -100,6 +100,7 @@ static Vec2 get_own_goal(struct Player* player);
 static bool ball_in_penalty_area(struct Ball *ball, Vec2 goal);
 static bool player_in_penalty_area(struct Player *player, Vec2 goal);
 static float triangle_area(Vec2 p1, Vec2 p2, Vec2 p3);
+static float calculate_angle(Vec2 v1, Vec2 v2);
 static bool is_player_available(struct Player* target, struct Player* origin, struct Scene *scene);
 static bool is_path_available(struct Player* origin, Vec2 velocity, struct Scene *scene);
 static struct Player* nearest_teammate(struct Player* origin,  struct Scene *scene);
@@ -156,7 +157,6 @@ static void gk_shooting_logic(struct Player *player,  struct Scene *scene);
 static void forward_change_state_logic(struct Player *player,  struct Scene *scene);
 static void defender_change_state_logic(struct Player *player,  struct Scene *scene);
 static void gk_change_state_logic(struct Player *player,  struct Scene *scene);
-
 
 
 /* Team 1 movement logic */
@@ -268,13 +268,13 @@ static struct Talents team1_talents[6] = {
     {7, 5, 1, 7},   // defender 1
     {8, 4, 1, 7},   // gk
     {7, 5, 2, 6},   // defender 2
-    {4, 5, 4, 7},   // forward 3
+    {2, 7, 4, 7},   // forward 3
 };
 
 /* Team 2 */
 static struct Talents team2_talents[6] = {
     {2, 6, 4, 8},   // forward 1
-    {4, 5, 4, 7},   // forward 2
+    {2, 7, 4, 7},   // forward 2
     {7, 5, 2, 6},   // defender 1
     {8, 4, 1, 7},   // gk
     {8, 5, 1, 6},   // defender 2
@@ -524,6 +524,15 @@ static float triangle_area(Vec2 p1, Vec2 p2, Vec2 p3){
     return fabs((p2.x * p3.y + p3.x * p1.y + p1.x * p2.y) - (p2.x * p1.y + p3.x * p2.y + p1.x * p3.y)) / 2.0f;
 }
 
+/**
+ * @brief Internal helper for calculating the angle between two vectors.
+ */
+static float calculate_angle(Vec2 v1, Vec2 v2){
+    float cos_angle = dotProduct(&v1, &v2) / (lengthVec2(&v1) * lengthVec2(&v2));
+
+    return acos(cos_angle);
+}
+
 
 /**
  * @brief This function checks if there is no player between the player given and the origin.
@@ -535,20 +544,44 @@ static bool is_player_available(struct Player* target, struct Player* origin, st
         struct Player* p2 = scene->second_team->players[i];
 
         if(p1 != target && p1 != origin){
-            float distance = hypotf(origin->position.x - target->position.x, origin->position.y - target->position.y);
-            float area = triangle_area(origin->position, target->position, p1->position);
+            Vec2 origin_v1, origin_v2;
+            vec2_sub(&origin_v1, &p1->position, &origin->position);
+            vec2_sub(&origin_v2, &target->position, &origin->position);
+            float origin_angle = calculate_angle(origin_v1, origin_v2);
 
-            float height = (area / distance) * 2.0f;
-            if(height <= NOT_AVAILABLE_HEIGHT) return false;
+            Vec2 target_v1, target_v2;
+            vec2_sub(&target_v1, &p1->position, &target->position);
+            vec2_sub(&target_v2, &origin->position, &target->position);
+            float target_angle = calculate_angle(target_v1, target_v2);
+
+            if((origin_angle >= 0 && origin_angle < PI/2) && (target_angle >= 0 && target_angle < PI/2)){
+                float distance = hypotf(origin->position.x - target->position.x, origin->position.y - target->position.y);
+                float area = triangle_area(origin->position, target->position, p1->position);
+
+                float height = (area / distance) * 2.0f;
+                if(height <= NOT_AVAILABLE_HEIGHT) return false;
+            }
         }
 
 
         if(p2 != target && p2 != origin){
-            float distance = hypotf(origin->position.x - target->position.x, origin->position.y - target->position.y);
-            float area = triangle_area(origin->position, target->position, p2->position);
+            Vec2 origin_v1, origin_v2;
+            vec2_sub(&origin_v1, &p1->position, &origin->position);
+            vec2_sub(&origin_v2, &target->position, &origin->position);
+            float origin_angle = calculate_angle(origin_v1, origin_v2);
 
-            float height = (area / distance) * 2.0f;
-            if(height <= NOT_AVAILABLE_HEIGHT) return false;
+            Vec2 target_v1, target_v2;
+            vec2_sub(&target_v1, &p1->position, &target->position);
+            vec2_sub(&target_v2, &origin->position, &target->position);
+            float target_angle = calculate_angle(target_v1, target_v2);
+            
+            if((origin_angle >= 0 && origin_angle < PI/2) && (target_angle >= 0 && target_angle < PI/2)){
+                float distance = hypotf(origin->position.x - target->position.x, origin->position.y - target->position.y);
+                float area = triangle_area(origin->position, target->position, p2->position);
+
+                float height = (area / distance) * 2.0f;
+                if(height <= NOT_AVAILABLE_HEIGHT) return false;
+            }
         }
     }
 
@@ -670,7 +703,7 @@ static bool is_velocity_towards_position(Vec2 velocity, Vec2 origin, Vec2 target
     float s = triangle_area(velocity, velocity_toward_target, velocity_sub);
     float sin_rotation = (2 * s) / (lengthVec2(&velocity) * lengthVec2(&velocity_toward_target));
 
-    if(sin_rotation >= 0 && sin_rotation <= 0.35f)
+    if(sin_rotation >= 0 && sin_rotation <= 0.25f)
         return true;
 
     return false;
@@ -1023,31 +1056,14 @@ static void defender_movement_logic(struct Player *player,  struct Scene *scene)
         player->velocity.x *= -1.0f;
     }
 
+    // reseting defender_tackled
+    if(ball->possessor && ball->possessor->team == player->team){
+        defender_tackled[(player->team) - 1][player->kit] = 0;
+    }
+
     // if player has the ball he tries to get close to center
     if(ball->possessor == player){
         if(!is_path_available(player, player->velocity, scene) || (CENTER_X - player->position.x) * player->velocity.x <= 0.0f){
-            // int failed_positioning_counter = 0;
-
-            /*while (1)
-            {
-                srand((unsigned int)time(NULL));
-                float random_y = (float) (rand() % (int) (PITCH_H - 100)) + PITCH_Y + 50.0f;
-                float target_x = CENTER_X;
-                    
-                Vec2 target = {
-                    .x = target_x,
-                    .y = random_y
-                };
-
-                Vec2 new_vel = make_velocity_vector(player->position, target, max_velocity);
-
-                if(is_path_available(player, new_vel, scene) || failed_positioning_counter >= 120){
-                    player->velocity = new_vel;
-                    break;
-                }
-                
-                failed_positioning_counter++;
-            }*/
             Vec2 target = {
                 .x = CENTER_X,
                 .y = CENTER_Y
@@ -1092,7 +1108,7 @@ static void defender_movement_logic(struct Player *player,  struct Scene *scene)
             struct Player *other_defender = (player->kit == 2) ? teammates[4] : teammates[2];
             float od_distance = hypotf(other_defender->position.x - ball->position.x, other_defender->position.y - ball->position.y);
 
-            if(b_distance <= od_distance){  
+            if(b_distance <= od_distance){
                 player->velocity = make_velocity_vector(player->position, ball->position, max_velocity);
                 defender_tackled[(player->team) - 1][player->kit] = 1;
             }
@@ -1211,7 +1227,6 @@ static void gk_movement_logic(struct Player *player,  struct Scene *scene){
         }
     }
 }
-
 
 /* -------------------------------------------------------------------------
  * shooting logic helper functions
@@ -1522,7 +1537,7 @@ static void defender_shooting_logic(struct Player *player,  struct Scene *scene)
                 if(distance <= DEFENDER_PANIC_ZONE && opponent[i]->state != IDLE){
                     struct Player *nearest_available = nearest_available_teammate(player, scene);
 
-                    if(nearest_available){
+                    if(nearest_available && nearest_available->kit != 3){
                         pass(ball, nearest_available, max_velocity);
                     }
                     else{
@@ -1572,7 +1587,7 @@ static void gk_shooting_logic(struct Player *player,  struct Scene *scene){
         struct Player* nearest = nearest_teammate(player, scene);
         pass(ball, nearest, max_speed);
     }
- }
+}
 
 
 /* -------------------------------------------------------------------------
@@ -1679,6 +1694,7 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
 
         // if someone is blocking attacker's path and he's not near the opponent's goal, his state will be set to SHOOTING
         else if(ball->possessor == player){
+            player_shot_fill_zero();
             struct Player **opponents = (player->team == 1) ? scene->second_team->players : scene->first_team->players;
             for (int i = 0; i < PLAYER_COUNT; i++)
             {
@@ -1761,10 +1777,6 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
 
     // tackle cooldown
     if (tackle_cooldowns[(player->team) - 1][player->kit] > 0) {
-        if(tackle_cooldowns[(player->team) - 1][player->kit] == 1){
-            defender_tackled[(player->team) - 1][player->kit] = 0;
-        }
-
         tackle_cooldowns[(player->team) - 1][player->kit]--;
         player->state = IDLE;
         return;
@@ -1774,7 +1786,6 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
     if (player->state == INTERCEPTING && is_ball_colliding(player, ball)) {
         if (ball->possessor == player) {
             tackle_cooldowns[(player->team) - 1][player->kit] = 0;
-            defender_tackled[(player->team) - 1][player->kit] = 0;
         } 
         
         else {
@@ -1790,8 +1801,7 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
 
     // if player has the ball he tries to pass it to the nearest available forward
     else if(ball->possessor == player){
-        defender_tackled[(player->team) - 1][player->kit] = 0;
-        
+        player_shot_fill_zero();
         struct Player *attackers[3];
         if(player->team == 1){
             attackers[0] = scene->first_team->players[0];
@@ -1831,7 +1841,7 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
             }
         }
 
-        if(fabs(CENTER_X - player->position.x) <= DEFENDER_PASS_BACK_DISTANCE) player->state = SHOOTING;
+        if(fabs(CENTER_X - player->position.x) <= PASS_RANGE) player->state = SHOOTING;
 
         else player->state = MOVING;
     }
