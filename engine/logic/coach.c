@@ -43,7 +43,7 @@ time_t last_pass_time;
 #define FORWARD_SHOOTING_RANGE 100.0f
 #define FORWARD_SHOOTING_MARGIN 40
 #define FORWARD_INTERCEPTING_RANGE 100.0f
-#define TACKLE_COOLDOWN 90
+#define TACKLE_COOLDOWN 100
 #define PENALTY_AREA_WIDTH 75.0F
 #define PENALTY_AREA_HEIGHT (GOAL_HEIGHT + 40)
 #define GK_ALERT_RANGE (PITCH_W / 2)
@@ -51,15 +51,14 @@ time_t last_pass_time;
 #define GK_COOLDOWN 180
 #define PATH_BLOCK_T 180
 #define DEFENDER_PASS_BACK_DISTANCE 50.0f
-#define PASS_RANGE PITCH_W / 7
+#define PASS_RANGE PITCH_W / 6
 #define DEFENDER_RECOVERY_COOLDOWN 120
 #define DEFENDER_PANIC_ZONE 50.0f
 #define FORWARD_RECOVERY_COOLDOWN 90
 #define FORWARD_PANIC_ZONE (PLAYER_RADIUS * 2 + 20.0f)
 #define FORWARD_ATTACK_ZONE 140.0f
 #define NOT_AVAILABLE_HEIGHT (PLAYER_RADIUS + BALL_RADIUS + 5.0f)
-#define PASS_COOLDOWN 1
-
+#define PASS_COOLDOWN 1.0f
 
 /* -------------------------------------------------------------------------
  * Logic Functions
@@ -107,6 +106,7 @@ static bool is_player_available(struct Player* target, struct Player* origin, st
 static bool is_path_available(struct Player* origin, Vec2 velocity, struct Scene *scene);
 static struct Player* nearest_teammate(struct Player* origin,  struct Scene *scene);
 static struct Player* nearest_available_teammate(struct Player* origin,  struct Scene *scene);
+static struct Player* nearest_option(struct Player* origin,  struct Scene *scene, struct Player** options, int options_size);
 static bool is_velocity_towards_position(Vec2 velocity, Vec2 origin, Vec2 target);
 
 
@@ -161,7 +161,21 @@ static void gk_change_state_logic(struct Player *player,  struct Scene *scene);
 
 
 /* Team 1 movement logic */
-void movement_logic_1_0(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
+void movement_logic_1_0(struct Player *self, struct Scene *scene) {
+    struct Ball* ball = scene->ball;
+    float max_speed = get_max_moving_velocity(self);
+
+    if(ball->possessor == self && self->position.x <= CENTER_X + 40.0f){
+        Vec2 target = {
+            .x = get_opponent_goal(self).x,
+            .y = ( (int) last_pass_time % ( (int) PITCH_W - 60 ) ) + 60
+        };
+
+        self->velocity = make_velocity_vector(self->position, target, max_speed);
+    } else {
+        forward_movement_logic(self, scene); 
+    }
+}
 void movement_logic_1_1(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_1_2(struct Player *self, struct Scene *scene) { defender_movement_logic(self, scene); }
 void movement_logic_1_3(struct Player *self, struct Scene *scene) { gk_movement_logic(self, scene); }
@@ -169,7 +183,21 @@ void movement_logic_1_4(struct Player *self, struct Scene *scene) { defender_mov
 void movement_logic_1_5(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 
 /* Team 2 movement logic */
-void movement_logic_2_0(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
+void movement_logic_2_0(struct Player *self, struct Scene *scene) { 
+    struct Ball* ball = scene->ball;
+    float max_speed = get_max_moving_velocity(self);
+
+    if(ball->possessor == self && self->position.x >= CENTER_X - 40.0f){
+        Vec2 target = {
+            .x = get_opponent_goal(self).x,
+            .y = ( (int) last_pass_time % ( (int) PITCH_H - 60 ) ) + 60
+        };
+
+        self->velocity = make_velocity_vector(self->position, target, max_speed);
+    } else {
+        forward_movement_logic(self, scene); 
+    }
+}
 void movement_logic_2_1(struct Player *self, struct Scene *scene) { forward_movement_logic(self, scene); }
 void movement_logic_2_2(struct Player *self, struct Scene *scene) { defender_movement_logic(self, scene); }
 void movement_logic_2_3(struct Player *self, struct Scene *scene) { gk_movement_logic(self, scene); }
@@ -185,18 +213,8 @@ void shooting_logic_1_0(struct Player *self, struct Scene *scene) {
     // pass the ball to one of the other forwards
     if(ball->possessor == self && fabs(self->position.x - opponent_goal.x) > FORWARD_ATTACK_ZONE && self->position.x - CENTER_X > 40.0f){
         struct Player* other_forwards[] = {scene->first_team->players[1], scene->first_team->players[5]};
-
-        for(int i = 0; i < 2; i++){
-            float distance = hypotf(self->position.x - other_forwards[i]->position.x, self->position.y - other_forwards[i]->position.y);
-            if(is_player_available(other_forwards[i], self, scene) && distance <= PASS_RANGE){
-                pass(ball, other_forwards[i], max_velocity);
-                return;
-            }
-        }
-
-        srand(time(NULL));
-        int random_index = rand() % 2;
-        pass(ball, other_forwards[random_index], max_velocity);
+        struct Player* nearest_forward = nearest_option(self, scene, other_forwards, 2);
+        pass(ball, nearest_forward, max_velocity);
     }
     
     else{
@@ -218,18 +236,8 @@ void shooting_logic_2_0(struct Player *self, struct Scene *scene) {
     // pass the ball to one of the other forwards
     if(ball->possessor == self && fabs(self->position.x - opponent_goal.x) > FORWARD_ATTACK_ZONE && self->position.x - CENTER_X < -40.0f){
         struct Player* other_forwards[] = {scene->second_team->players[1], scene->second_team->players[5]};
-
-        for(int i = 0; i < 2; i++){
-            float distance = hypotf(self->position.x - other_forwards[i]->position.x, self->position.y - other_forwards[i]->position.y);
-            if(is_player_available(other_forwards[i], self, scene) && distance <= PASS_RANGE){
-                pass(ball, other_forwards[i], max_velocity);
-                return;
-            }
-        }
-
-        srand(time(NULL));
-        int random_index = rand() % 2;
-        pass(ball, other_forwards[random_index], max_velocity);
+        struct Player* nearest_forward = nearest_option(self, scene, other_forwards, 2);
+        pass(ball, nearest_forward, max_velocity);
     }
     
     else{
@@ -340,22 +348,22 @@ PlayerLogicFn get_change_state_logic(int team, int kit) {
  * ------------------------------------------------------------------------- */
 /* Team 1 */
 static struct Talents team1_talents[6] = {
-    {3, 6, 4, 7},   // forward 1   
-    {3, 7, 3, 7},   // forward 2
-    {7, 5, 1, 7},   // defender 1
-    {8, 4, 1, 7},   // gk
-    {7, 5, 2, 6},   // defender 2
-    {2, 7, 4, 7},   // forward 3
+    {1, 9, 3, 7},   // forward 1   
+    {2, 8, 2, 8},   // forward 2
+    {3, 9, 1, 7},   // defender 1
+    {2, 6, 2, 10},  // gk
+    {2, 8, 2, 8},   // defender 2
+    {1, 8, 2, 8},   // forward 3
 };
 
 /* Team 2 */
 static struct Talents team2_talents[6] = {
-    {2, 6, 4, 8},   // forward 1
-    {2, 7, 4, 7},   // forward 2
-    {7, 5, 2, 6},   // defender 1
-    {8, 4, 1, 7},   // gk
-    {8, 5, 1, 6},   // defender 2
-    {3, 7, 3, 7},   // forward 3
+    {1, 9, 3, 7},   // forward 1
+    {2, 8, 2, 8},   // forward 2
+    {3, 9, 1, 7},   // defender 1
+    {2, 6, 2, 10},  // gk
+    {2, 8, 2, 8},   // defender 2
+    {1, 8, 2, 8},   // forward 3
 };
 
 struct Talents get_talents(int team, int kit) {
@@ -372,7 +380,7 @@ static struct Vec2 team1_positions[6] = {
     {350, CENTER_Y},        // forward 1
     {300, CENTER_Y-150},    // forward 2
     {200, CENTER_Y-75},     // defender 1
-    {40, CENTER_Y},         // gk
+    {60, CENTER_Y},         // gk
     {200, CENTER_Y+75},     // defender 2
     {300, CENTER_Y+150},    // forward 3
 };
@@ -382,7 +390,7 @@ static struct Vec2 team2_positions[6] = {
     {750, CENTER_Y},        // forward 1
     {700, CENTER_Y-150},    // forward 2
     {800, CENTER_Y-75},     // defender 1
-    {960, CENTER_Y},        // gk
+    {940, CENTER_Y},        // gk
     {800, CENTER_Y+75},     // defender 2
     {700, CENTER_Y+150},    // forward 3
 };
@@ -400,7 +408,7 @@ static struct Vec2 team1_preferred_positions[6] = {
     {400, CENTER_Y},        // forward 1
     {700, CENTER_Y-150},    // forward 2
     {200, CENTER_Y-75},     // defender 1
-    {40, CENTER_Y},         // gk
+    {60, CENTER_Y},         // gk
     {200, CENTER_Y+75},     // defender 2
     {700, CENTER_Y+150},    // forward 3
 };
@@ -410,7 +418,7 @@ static struct Vec2 team2_preferred_positions[6] = {
     {600, CENTER_Y},        // forward 1
     {300, CENTER_Y-150},    // forward 2
     {800, CENTER_Y-75},     // defender 1
-    {960, CENTER_Y},        // gk
+    {940, CENTER_Y},        // gk
     {800, CENTER_Y+75},     // defender 2
     {300, CENTER_Y+150},    // forward 3
 };
@@ -755,6 +763,28 @@ static struct Player* nearest_available_teammate(struct Player* origin,  struct 
         p = teammates[i];
         float d = hypotf(p->position.x - scene->ball->position.x, p->position.y - scene->ball->position.y);
         if (d < min_dist && is_player_available(p, origin, scene)) { min_dist = d; nearest = p; }
+    }
+    
+    if (!nearest) return NULL;
+
+    return nearest;
+}
+
+/**
+ * @brief This function finds the nearest teammate from an array related to an origin.
+ */
+static struct Player* nearest_option(struct Player* origin,  struct Scene *scene, struct Player** options, int options_size){
+    struct Player* nearest = NULL;
+    float min_dist = 999999.0f;
+    struct Player* p = NULL;
+    
+    for (int i = 0; i < options_size; i++)
+    {
+        if(options[i] == origin) continue;
+
+        p = options[i];
+        float d = hypotf(p->position.x - scene->ball->position.x, p->position.y - scene->ball->position.y);
+        if (d < min_dist) { min_dist = d; nearest = p; }
     }
     
     if (!nearest) return NULL;
@@ -1276,7 +1306,7 @@ static void gk_movement_logic(struct Player *player,  struct Scene *scene){
 
             srand(time(NULL));
             float random_y = (float) (rand() % (int) (GOAL_HEIGHT - 20)) + top_line + 10.0f;
-            float target_x = gk_goal.x;
+            float target_x = get_preferred_positions(player->team, player->kit).x;
 
             Vec2 target = {
                 .x = target_x,
@@ -1454,6 +1484,7 @@ static void forward_shooting_logic(struct Player *player,  struct Scene *scene){
     else if(is_out(scene) && ball->possessor == player){
         struct Player* nearest = nearest_teammate(player, scene);
         pass(ball, nearest, max_velocity);
+        ball_shot_towards_opponent_goal = false;
     }   
 
 
@@ -1649,8 +1680,15 @@ static void gk_shooting_logic(struct Player *player,  struct Scene *scene){
     if(ball->possessor == player && gk_cooldown[(player->team) - 1] > GK_COOLDOWN){
         gk_cooldown[(player->team) - 1] = 0;
 
-        struct Player* nearest = nearest_teammate(player, scene);
-        pass(ball, nearest, max_speed);
+        // struct Player* nearest = nearest_teammate(player, scene);
+        // pass(ball, nearest, max_speed);
+        struct Player** teammates = (player->team == 1) ? scene->first_team->players : scene->second_team->players;
+        struct Player* options[] = {teammates[0], teammates[2], teammates[4]};
+        
+        // choosing a player to pass to
+        srand(time(NULL));
+        int random_index = rand() % 3;
+        pass(ball, options[random_index], max_speed);
     }
 }
 
@@ -1699,7 +1737,7 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
 
     // player tries to get the ball if it hits him
     if(is_ball_colliding(player, ball) && ball->possessor != player){
-        if(last_ball_possessor == player && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
+        if(last_ball_possessor == player && !is_out(scene) && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
             return;
 
         player->state = INTERCEPTING;
@@ -1773,7 +1811,10 @@ static void forward_change_state_logic(struct Player *player,  struct Scene *sce
                 struct Player *opponent = opponents[i];
                 float distance = hypotf(player->position.x - opponent->position.x, player->position.y - opponent->position.y);
                 if(is_velocity_towards_position(player->velocity, player->position, opponent->position) && distance <= FORWARD_PANIC_ZONE && fabs(player->position.x - opponent_goal.x) >= FORWARD_ATTACK_ZONE){
-                    if(nearest_available_teammate(player, scene)) player->state = SHOOTING;
+                    struct Player **teammates = (player->team == 1) ? scene->first_team->players : scene->second_team->players;
+                    struct Player *other_forward = (player->kit == 1) ? teammates[5] : teammates[1];
+                    
+                    if(is_player_available(other_forward, player, scene)) player->state = SHOOTING;
                     else player->state = MOVING;
                     return;
                 }
@@ -1869,7 +1910,7 @@ static void defender_change_state_logic(struct Player *player,  struct Scene *sc
 
     // if ball is near the player, he tries to catch it
     if(is_ball_colliding(player, ball) && ball->possessor != player){
-        if(last_ball_possessor == player && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
+        if(last_ball_possessor == player && !is_out(scene) && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
             return;
 
         player->state = INTERCEPTING;
@@ -1980,22 +2021,11 @@ static void gk_change_state_logic(struct Player *player,  struct Scene *scene){
 
         // if ball is near gk, he tries to catch it
         if(is_ball_colliding(player, ball) && ball->possessor != player){
-            if(last_ball_possessor == player && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
+            if(last_ball_possessor == player && !is_out(scene) && difftime(time(NULL), last_pass_time) <= PASS_COOLDOWN)
                 return;
             
-            if(ball_shot_towards_opponent_goal){
-                // randomizing gk's dive success
-                int pseudo_random_number = last_pass_time % 3;
-                if(pseudo_random_number == 1){
-                    player->state = IDLE;
-                } else {
-                    player->state = INTERCEPTING;
-                    ball_shot_towards_opponent_goal = false;
-                }
-            } else {
-                player->state = INTERCEPTING;
-                ball_shot_towards_opponent_goal = false;
-            }
+            player->state = INTERCEPTING;
+            ball_shot_towards_opponent_goal = false;
         }
 
         // if ball is far from gk, his state will be set to MOVING
